@@ -3,17 +3,19 @@
 
 #include "relation.h"
 #include <fstream>
+#include <sstream>
+#include <cstddef>
+#include <iostream>
 
-template<std::size_t N>
-std::istream& operator>>(std::istream& is, Relation<int, N>& rel)
+std::istream& operator>>(std::istream& is, Relation<int>& rel)
 {
-	int var;
+	auto arity = rel.get_arity();
 	std::size_t mod = 0;
-	typename Relation<int, N>::tuple_t tpl;
-	while (is >> var) {
+	typename Relation<int>::tuple_t tpl(arity);
+	for (int var; is >> var;) {
 		tpl[mod] = var;
 		mod++;
-		if (mod == N) {
+		if (mod == arity) {
 			mod = 0;
 			rel.push_tuple(tpl);
 		}
@@ -22,8 +24,7 @@ std::istream& operator>>(std::istream& is, Relation<int, N>& rel)
 	return is;
 }
 
-template<std::size_t N>
-std::ostream& operator<<(std::ostream& os, Relation<int, N>& rel)
+std::ostream& operator<<(std::ostream& os, Relation<int>& rel)
 {
 	for (auto& tuple : rel) {
 		bool first = true;
@@ -38,16 +39,29 @@ std::ostream& operator<<(std::ostream& os, Relation<int, N>& rel)
 	return os;
 }
 
-template<std::size_t N>
-void read_file(std::string& filename, Relation<int, N>& rel)
+std::size_t read_arity(std::string& filename)
+{
+	std::ifstream ifs(filename);
+	std::string first_line;
+
+	std::getline(ifs, first_line);
+	std::istringstream line_stream(first_line);
+
+	int arity = 0;
+	for (int x; line_stream >> x;)	arity++;
+
+	ifs.close();
+	return arity;
+}
+
+void read_file(std::string& filename, Relation<int>& rel)
 {
 	std::ifstream ifs(filename);
 	ifs >> rel;
 	ifs.close();
 }
 
-template<std::size_t N>
-void write_file(const std::string& filename, Relation<int, N>& rel)
+void write_file(const std::string& filename, Relation<int>& rel)
 {
 	std::ofstream ofs(filename);
 	ofs << rel;

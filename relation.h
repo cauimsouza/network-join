@@ -3,11 +3,12 @@
 
 #include <vector>
 #include <array>
+#include <stdexcept>
 
-template<typename T, std::size_t N>
+template<typename T>
 class Relation {
 public:
-	using tuple_t = std::array<T, N>;
+	using tuple_t = std::vector<T>;
 private:
 	/* private typenames */
 	using tuples_t = typename std::vector<tuple_t>;
@@ -22,25 +23,27 @@ public:
 	using iterator = typename tuples_t::iterator;
 
 	/* constructors */	
-	explicit Relation();
+	explicit Relation(std::size_t n) : arity{n} {
+		if (n <= 0) throw std::invalid_argument("arity should be\
+				positive integer"); }
 
 	/* destructors */
 
 	/* member public funcitons */
 	std::size_t size() { return tuples.size(); }
+	std::size_t get_arity() { return arity; }
 	iterator begin() { return tuples.begin(); }
 	iterator end() { return tuples.end(); }
 
 	void push_tuple(tuple_t tpl);
 };
 
-template<typename T, std::size_t N>
-Relation<T, N>::Relation() : arity(N) 
-{}
-
-template<typename T, std::size_t N>
-void Relation<T, N>::push_tuple(tuple_t tpl)
+template<typename T>
+void Relation<T>::push_tuple(tuple_t tpl)
 {
+	if (tpl.size() != arity)
+		throw std::invalid_argument("tpl size does not match arity");
+
 	tuples.push_back(tpl);		
 }
 

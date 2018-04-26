@@ -4,13 +4,14 @@
 #include <algorithm>
 #include <iostream>
 #include "ioutil.h"
+#include <vector>
 
-template<typename T, std::size_t N>
-void sort(Relation<T, N>& rel, typename Relation<int, N>::tuple_t& perm)
+template<typename T>
+void sort(Relation<T>& rel, const std::vector<int> perm)
 {
 	std::sort(rel.begin(), rel.end(),
-	[perm](const typename Relation<T, N>::tuple_t& A,
-	       const typename Relation<T, N>::tuple_t& B) {
+	[perm](const typename Relation<T>::tuple_t& A,
+	       const typename Relation<T>::tuple_t& B) {
 		for (int i : perm)
 			if (A[i] < B[i])	return true;
 			else if (A[i] > B[i])	return false;

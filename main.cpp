@@ -9,16 +9,18 @@ using namespace std;
 
 int main()
 {
-	Relation<int, 2> rel;
 	string filename = "input.txt";
+	auto sz = read_arity(filename);
+	Relation<int> rel(sz);
 	
 	read_file(filename, rel);
 	//cin >> rel;
 	cout << rel.size() << " elements" << endl;
+	cout << rel << endl;
 	
-	Relation<int, 2>::tuple_t permut;
-	permut[0] = 1;
-	permut[1] = 0;
+	vector<int> permut(2);
+	permut[0] = 0;
+	permut[1] = 1;
 	sort(rel, permut);
 	/*
 	for (auto it = rel.begin(); it != rel.end(); it++) {
