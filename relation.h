@@ -9,6 +9,7 @@ template<typename T>
 class Relation {
 public:
 	using tuple_t = std::vector<T>;
+	using value_type = T;
 private:
 	/* private typenames */
 	using tuples_t = typename std::vector<tuple_t>;

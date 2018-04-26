@@ -3,9 +3,18 @@
 
 #include <algorithm>
 #include <iostream>
-#include "ioutil.h"
 #include <vector>
+#include <unordered_set>
+#include "relation.h"
 
+/* 
+ * Sorts a relation according to the order prescribed by perm
+ *
+ * @param rel relation to sort
+ * @param perm permutation of the set {0, ..., rel.arity() -1}
+ * 	according to which the tuples in the relation will be
+ *	sorted
+ */
 template<typename T>
 void sort(Relation<T>& rel, const std::vector<int> perm)
 {
@@ -18,4 +27,46 @@ void sort(Relation<T>& rel, const std::vector<int> perm)
 		return false; });
 }
 
+/*
+ * Takes two vectors A and B, and returns a third vector
+ * C containing the common elements without repetition
+ * 
+ * @param A first vector
+ * @param B second vector
+ * @return a vector containing the common elements in 
+ *	A and B
+ */
+template<typename T>
+std::vector<T> common_elems(const std::vector<T>& A,
+			      const std::vector<T>& B)
+{
+	std::unordered_set<T> hsetA{A.begin(), A.end()};
+	std::unordered_set<T> hsetB{B.begin(), B.end()};
+	std::vector<T> C;
+	
+	for (auto& i : hsetA) 
+		if (hsetB.find(i) != hsetB.end()) 
+			C.push_back(i);
+	
+	std::sort(C.begin(), C.end());
+
+	return C;	
+}
+
+/*
+ * Takes a vector of integers var_vect and a subvector
+ * common_vect, and assign to each number x in var_vect a unique integer
+ * p(x) in the range [0, var_vect.size()) such that:
+ * - if x appears in common_vect and y does not, then p(x) < p(y)
+ * - if both x and y appears in common_vect, then
+ *   p(x) < p(y) <=> x < y
+ * - x != y => p(x) != p(y)
+ * 
+ * @param var_vect vector of integers
+ * @param common_vect vector of integers, subvector of var_vect
+ * 	  WARNING: common_vect must be ordered!!!
+ * @return a permutation of [0, var_vect.size()) as described above 
+ */
+std::vector<int> get_perm(const std::vector<int>& var_vect,
+			  const std::vector<int>& common_vect);
 #endif

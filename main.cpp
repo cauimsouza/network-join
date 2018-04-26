@@ -34,5 +34,18 @@ int main()
 	string ofilename = "output.txt";
 	write_file(ofilename, rel);
 
+	cout << "hello" << endl;
+	vector<int> A{2, 1, 3, 4, 1};
+	vector<int> B{5, 6, 1, 7, 2};
+	auto C = common_elems(A, B);
+	for (auto i : C)
+		cout << i << " ";
+	cout << endl;
+
+	auto D = get_perm(B, C); 
+	for (auto i : D)
+		cout << i << " ";
+	cout << endl;
+
 	return 0;	
 }
