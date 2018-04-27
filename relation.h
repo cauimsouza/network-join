@@ -2,7 +2,6 @@
 #define RELATION_H
 
 #include <vector>
-#include <array>
 #include <stdexcept>
 
 template<typename T>
@@ -15,7 +14,7 @@ private:
 	using tuples_t = typename std::vector<tuple_t>;
 
 	/* member variables */
-	const std::size_t arity;
+	std::size_t arity;
 	tuples_t tuples; 
 
 	/* member private functions */
@@ -27,6 +26,13 @@ public:
 	explicit Relation(std::size_t n) : arity{n} {
 		if (n <= 0) throw std::invalid_argument("arity should be\
 				positive integer"); }
+	Relation(const Relation& rel) : arity{rel.arity}, tuples{rel.tuples} {}
+	Relation(Relation&& rel) : arity{rel.arity}, tuples{rel.tuples} {}
+
+	Relation& operator=(Relation&& rel) {
+		arity = rel.arity;
+		tuples = rel.tuples;
+	}
 
 	/* destructors */
 

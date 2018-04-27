@@ -2,4 +2,5 @@
 *.txt
 main
 util
+build/
 

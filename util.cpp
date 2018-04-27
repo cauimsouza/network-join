@@ -4,15 +4,17 @@
 #include <set>
 #include "util.h"
 #include "ioutil.h"
+#include "debug.h"
 
 /*
  * Takes a vector of integers var_vect and a subvector
- * common_vect, and assign to each number x in var_vect a unique integer
- * p(x) in the range [0, var_vect.size()) such that:
- * - if x appears in common_vect and y does not, then p(x) < p(y)
- * - if both x and y appears in common_vect, then
- *   p(x) < p(y) <=> x < y
- * - x != y => p(x) != p(y)
+ * common_vect, and generates a list of priorities for
+ * each number in var_vect such that:
+ * - every number has a different priority
+ * - if x is in common_vect and y is not, then x will
+ *   receive higher priority (lower number)
+ * - if x and y appear in common_vect, the one who appears
+ *   first will receive higher priority
  * 
  * @param var_vect vector of integers
  * @param common_vect vector of integers, subvector of var_vect
@@ -24,9 +26,13 @@ std::vector<int> get_perm(const std::vector<int>& var_vect,
 {
 	std::vector<int> map_vect(var_vect.size(), 0);
 	for (std::size_t i = 0; i < var_vect.size(); i++) {
-		int id = std::lower_bound(common_vect.begin(),
-				common_vect.end(), var_vect[i])
-			 - common_vect.begin();
+		auto it = std::lower_bound(common_vect.begin(),
+				common_vect.end(), var_vect[i]);
+		int id = it - common_vect.begin();
+
+		if (it == common_vect.end() || *it != var_vect[i])
+			id = common_vect.size();
+
 		map_vect[i] = id;
 	}
 
@@ -40,7 +46,7 @@ std::vector<int> get_perm(const std::vector<int>& var_vect,
 
 	std::vector<int> perm(var_vect.size(), 0);
 	for (std::size_t i = 0; i < perm.size(); i++) 
-		perm[i] = freq_vect[map_vect[i]]++;
+		perm[freq_vect[map_vect[i]]++] = i;
 
 	return perm;
 }
@@ -232,7 +238,7 @@ Relation<int> join(Relation<int>& rel1,
 			for (auto it3 = it2; it3 != rel2.end() && 
 			     compare_assignments(*it1, matching1, *it3, matching2) == 0;
 			     it3++)
-			     join_rel.push_tuple(merge_reduce_tpls(*it1, *it2,
+			     join_rel.push_tuple(merge_reduce_tpls(*it1, *it3,
 			     			     vars1, vars2, unique_vars));	
 
 			it1++;
@@ -242,34 +248,95 @@ Relation<int> join(Relation<int>& rel1,
 	return join_rel;
 }
 
-// TEST JOIN FUNCTION
-using namespace std;
+Relation<int> multiway_join(std::vector<Relation<int>>& relv,
+		   std::vector<std::vector<int>>& varsv,
+		   std::vector<int>& result_vars)
+{
+	auto rel_it = relv.begin();
+	auto vars_it = varsv.begin();
+	Relation<int> result_rel = *rel_it;
+	result_vars = *vars_it;
 
-int main() {
-	string f1 = "input1.txt";
-	string f2 = "input2.txt";
-	Relation<int> r1(3);
-	Relation<int> r2(2);
-	read_file(f1, r1);
-	read_file(f2, r2);
+	rel_it++;
+	vars_it++;
+	while (rel_it != relv.end()) {
+		result_rel = join(result_rel, *rel_it, result_vars, *vars_it);
+		result_vars = get_unique_vars(result_vars, *vars_it);
 
-	string f3 = "output1.txt";
-	string f4 = "output2.txt";
+		rel_it++;
+		vars_it++;
+	}
 
-	write_file(f3, r1);
-	write_file(f4, r2);
-
-	vector<int> vars1{2, 1, 2};
-	vector<int> vars2{2, 3};
-
-	auto ans = join(r1, r2, vars1, vars2);
-	auto vars = get_unique_vars(vars1, vars2);
-	cout << "vars" << endl;
-	for (auto i : vars) cout << i << " "; cout << endl << endl;
-	cout << ans << endl;
-
-	return 0;
+	return result_rel;
 }
+
+// using namespace std;
+// int main()
+// {
+// 	string f1 = "input1.txt";
+// 	string f2 = "input2.txt";
+// 	string f3 = "input3.txt";
+//
+// 	Relation<int> r1(2);
+// 	Relation<int> r2(2);
+// 	Relation<int> r3(2);
+//
+// 	read_file(f1, r1);
+// 	read_file(f2, r2);
+// 	read_file(f3, r3);
+//
+// 	vector<int> vars1{1, 2};
+// 	vector<int> vars2{2, 3};
+// 	vector<int> vars3{3, 1};
+//
+// 	vector<Relation<int>> relv;
+// 	relv.push_back(r1);
+// 	relv.push_back(r2);
+// 	relv.push_back(r3);
+// 	vector<vector<int>> varsv{vars1, vars2, vars3};
+//
+// 	vector<int> result_vars;
+//
+// 	Relation<int> rel = multiway_join(relv, varsv, result_vars);
+//
+// 	pv(result_vars);
+// 	p("");
+// 	for (auto tpl : rel) {
+// 		pv(tpl);
+// 	}
+//
+// 	return 0;
+// }
+
+
+// TEST JOIN FUNCTION
+// using namespace std;
+//
+// int main() {
+// 	string f1 = "input1.txt";
+// 	string f2 = "input2.txt";
+// 	Relation<int> r1(3);
+// 	Relation<int> r2(2);
+// 	read_file(f1, r1);
+// 	read_file(f2, r2);
+//
+// 	string f3 = "output1.txt";
+// 	string f4 = "output2.txt";
+//
+// 	write_file(f3, r1);
+// 	write_file(f4, r2);
+//
+// 	vector<int> vars1{2, 1, 2};
+// 	vector<int> vars2{2, 3};
+//
+// 	auto ans = join(r1, r2, vars1, vars2);
+// 	auto vars = get_unique_vars(vars1, vars2);
+// 	cout << "vars" << endl;
+// 	for (auto i : vars) cout << i << " "; cout << endl << endl;
+// 	cout << ans << endl;
+//
+// 	return 0;
+// }
 //
 // /* Test functions get_unique_vars and merge_reduce_tpls */
 // using namespace std;
