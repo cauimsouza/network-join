@@ -65,6 +65,18 @@ int compare_assignments(const std::vector<int>& tpl1, const std::vector<int>& ma
 	return 0;
 }
 
+bool consistent(const std::vector<int>& tpl, const std::vector<int>& vars)
+{
+	for (std::size_t i = 1; i < vars.size(); i++) {
+		for (int j = i - 1; j >= 0; j--)
+			if (vars[i] == vars[j]) {
+				if (tpl[i] == tpl[j])	break;
+				else	return false;
+			}
+	}
+	return true;
+}
+
 std::vector<std::pair<Relation<int>::tuple_t, Relation<int>::tuple_t>> join(Relation<int>& rel1, Relation<int>& rel2, const std::vector<int>& var1,
 const std::vector<int>& var2)
 {
@@ -83,6 +95,8 @@ const std::vector<int>& var2)
 
 		if (comp < 0) it1++;
 		else if (comp > 0) it2++;
+		else if (!consistent(*it1, var1)) it1++;
+		else if (!consistent(*it2, var2)) it2++;
 		else {
 			for (auto it3 = it2; it3 != rel2.end() && 
 			     compare_assignments(*it1, matching1, *it3, matching2) == 0;
@@ -96,37 +110,36 @@ const std::vector<int>& var2)
 	return join_vector;
 }
 
-/* TEST JOIN FUNCTION
-using namespace std;
-
-int main() {
-	string f1 = "input1.txt";
-	string f2 = "input2.txt";
-	Relation<int> r1(2);
-	Relation<int> r2(2);
-	read_file(f1, r1);
-	read_file(f2, r2);
-
-	string f3 = "output1.txt";
-	string f4 = "output2.txt";
-
-	write_file(f3, r1);
-	write_file(f4, r2);
-
-	vector<int> vars1{1, 2};
-	vector<int> vars2{3, 4};
-
-	auto ans = join(r1, r2, vars1, vars2);
-
-	for (auto par : ans) {
-		auto v1 = par.first;
-		for (auto i : v1) cout << i << " ";
-		cout << "| ";
-		auto v2 = par.second;
-		for (auto i : v2) cout << i << " ";
-		cout << endl;
-	}
-
-	return 0;
-}
-*/
+// TEST JOIN FUNCTION
+// using namespace std;
+//
+// int main() {
+// 	string f1 = "input1.txt";
+// 	string f2 = "input2.txt";
+// 	Relation<int> r1(3);
+// 	Relation<int> r2(2);
+// 	read_file(f1, r1);
+// 	read_file(f2, r2);
+//
+// 	string f3 = "output1.txt";
+// 	string f4 = "output2.txt";
+//
+// 	write_file(f3, r1);
+// 	write_file(f4, r2);
+//
+// 	vector<int> vars1{2, 1, 2};
+// 	vector<int> vars2{2, 3};
+//
+// 	auto ans = join(r1, r2, vars1, vars2);
+//
+// 	for (auto par : ans) {
+// 		auto v1 = par.first;
+// 		for (auto i : v1) cout << i << " ";
+// 		cout << "| ";
+// 		auto v2 = par.second;
+// 		for (auto i : v2) cout << i << " ";
+// 		cout << endl;
+// 	}
+//
+// 	return 0;
+// }
