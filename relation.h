@@ -36,16 +36,7 @@ public:
 	iterator begin() { return tuples.begin(); }
 	iterator end() { return tuples.end(); }
 
-	void push_tuple(tuple_t tpl);
+	void push_tuple(tuple_t tpl) { tuples.push_back(tpl); }
 };
-
-template<typename T>
-void Relation<T>::push_tuple(tuple_t tpl)
-{
-	if (tpl.size() != arity)
-		throw std::invalid_argument("tpl size does not match arity");
-
-	tuples.push_back(tpl);		
-}
 
 #endif

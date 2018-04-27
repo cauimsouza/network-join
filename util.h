@@ -69,4 +69,18 @@ std::vector<T> common_elems(const std::vector<T>& A,
  */
 std::vector<int> get_perm(const std::vector<int>& var_vect,
 			  const std::vector<int>& common_vect);
+
+/*
+ * Performs join operation in two relations.
+ *
+ * @param rel1 first relation
+ * @param rel2 second relation
+ * @param var1 tuple of variables for first relation
+ * @param var2 tuple of variables for second relation
+ * @return result of join operation as a new relation
+ */
+Relation<int> join(Relation<int>& rel1,
+		   Relation<int>& rel2,
+		   const std::vector<int>& var1,
+     		   const std::vector<int>& var2);
 #endif

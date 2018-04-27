@@ -1,9 +1,24 @@
 #include <algorithm>
 #include <vector>
 #include <utility>
+#include <set>
 #include "util.h"
 #include "ioutil.h"
 
+/*
+ * Takes a vector of integers var_vect and a subvector
+ * common_vect, and assign to each number x in var_vect a unique integer
+ * p(x) in the range [0, var_vect.size()) such that:
+ * - if x appears in common_vect and y does not, then p(x) < p(y)
+ * - if both x and y appears in common_vect, then
+ *   p(x) < p(y) <=> x < y
+ * - x != y => p(x) != p(y)
+ * 
+ * @param var_vect vector of integers
+ * @param common_vect vector of integers, subvector of var_vect
+ * 	  WARNING: common_vect must be ordered!!!
+ * @return a permutation of [0, var_vect.size()) as described above 
+ */
 std::vector<int> get_perm(const std::vector<int>& var_vect,
 			  const std::vector<int>& common_vect)
 {
@@ -54,6 +69,27 @@ std::vector<int> index_common_variables(const std::vector<int>& vars,
 	return id_vector;
 }
 
+/*
+ * This function compares assignments of two tuples based on the order
+ * given by the matching vectors.
+ *
+ * @param tpl1 assignment of first tuple
+ * @param matching1 order in which elements in tpl1 should be considered
+ * 	in the comparison
+ * @param tpl2 assingment of second tuple
+ * @param matching2 order in which elements in tpl2 should be considered
+ * 	in the comparison
+ * @return
+ * - 0 if the tuples are equal according to the orders determined by the
+ *   matching vectors
+ * - 1 if the first tuple is considered to be greater than the second
+ * - -1 if the first tuple is considered to be smaller than the second
+ *
+ * Remarks:
+ * - the matching vectors do not need to be exhaustive. It might be possible 
+ *   not to consider some elements (or any of them).
+ * - the matching vectors must have the same size.
+ */
 int compare_assignments(const std::vector<int>& tpl1, const std::vector<int>& matching1,
 		const std::vector<int>& tpl2, const std::vector<int>& matching2)
 {
@@ -65,6 +101,18 @@ int compare_assignments(const std::vector<int>& tpl1, const std::vector<int>& ma
 	return 0;
 }
 
+/*
+ * Checks if an assignment to a tuple is consistent with the assignment of
+ * variables. Example:
+ * assignment (1, 2, 3) is consistent with the tuple (x_1, x_2, x_3) but
+ * not with the tuple (x_1, x_2, x_1) because the first and last elements
+ * of the assingment have different values while they are values of the same
+ * variable.
+ *
+ * @param tpl assignment of values to variables in vars
+ * @param vars variables
+ * @return true if the assignment tpl is consistent with variables in vars
+ */
 bool consistent(const std::vector<int>& tpl, const std::vector<int>& vars)
 {
 	for (std::size_t i = 1; i < vars.size(); i++) {
@@ -74,72 +122,174 @@ bool consistent(const std::vector<int>& tpl, const std::vector<int>& vars)
 				else	return false;
 			}
 	}
+
 	return true;
 }
 
-std::vector<std::pair<Relation<int>::tuple_t, Relation<int>::tuple_t>> join(Relation<int>& rel1, Relation<int>& rel2, const std::vector<int>& var1,
-const std::vector<int>& var2)
+/*
+ * Returns a (sorted) vector containing each element present in either
+ * vars1 or vars2, exactly once
+ *
+ * @param vars1 first vector of integers
+ * @param vars2 second vector of integers
+ * @return a vector containing each element in the union of 
+ * 	vars1 and vars2, exactly once
+ */
+std::vector<int> get_unique_vars(const std::vector<int>& vars1,
+				 const std::vector<int>& vars2)
 {
-	auto common_vars = common_elems(var1, var2);	
-	auto matching1 = index_common_variables(var1, common_vars);
-	auto matching2 = index_common_variables(var2, common_vars);
+	std::set<int> vars_set{vars1.begin(), vars1.end()};
+	vars_set.insert(vars2.begin(), vars2.end());
+	std::vector<int> unique_vars{vars_set.begin(), vars_set.end()};
+	return unique_vars;
+}
 
-	sort(rel1, get_perm(var1, common_vars));
-	sort(rel2, get_perm(var2, common_vars));
+/*
+ * Merge two tuples of assignments based on the variables associated
+ * with each one.
+ *
+ * @param tpl1 first tuple of assignment
+ * @param tpl2 second tuple of assignment
+ * @param vars1 variables associated with first tuple
+ * @param vars2 variables associated with second tuple
+ * @param unique_vars vector sorted in increasing order containing
+ * 	the variables appearing in either vars1 or vars2, exactly
+ * 	once
+ * @return a tuple containing assignments to the variables in
+ * 	unique_vars in the same order
+ */
+std::vector<int> merge_reduce_tpls(const std::vector<int>& tpl1,
+				   const std::vector<int>& tpl2,
+				   const std::vector<int>& vars1,
+				   const std::vector<int>& vars2,
+				   const std::vector<int>& unique_vars)
+{
+	std::vector<int> tpl(unique_vars.size());	
+	std::vector<bool> vars_filled(unique_vars.size(), false);
+	
+	std::size_t counter = 0;
+	for (std::size_t i = 0; i < vars1.size() && counter < tpl.size(); i++) {
+		int id = std::lower_bound(unique_vars.begin(),
+					  unique_vars.end(),
+					  vars1[i]) -
+			 unique_vars.begin();
+		if (!vars_filled[id]) {
+			vars_filled[id] = true;
+			tpl[id] = tpl1[i];
+			counter++;
+		}
+	}
 
-	std::vector<std::pair<Relation<int>::tuple_t, Relation<int>::tuple_t>> join_vector;
+	for (std::size_t i = 0; i < vars2.size() && counter < tpl.size(); i++) {
+		int id = std::lower_bound(unique_vars.begin(),
+					  unique_vars.end(),
+					  vars2[i]) -
+			 unique_vars.begin();
+		if (!vars_filled[id]) {
+			vars_filled[id] = true;
+			tpl[id] = tpl2[i];
+			counter++;
+		}
+	}
+
+	return tpl;
+}
+
+/*
+ * Performs join operation in two relations.
+ *
+ * @param rel1 first relation
+ * @param rel2 second relation
+ * @param vars1 tuple of variables for first relation
+ * @param vars2 tuple of variables for second relation
+ * @return result of join operation
+ */
+Relation<int> join(Relation<int>& rel1,
+		   Relation<int>& rel2,
+		   const std::vector<int>& vars1,
+     		   const std::vector<int>& vars2)
+{
+	auto common_vars = common_elems(vars1, vars2);	
+	auto unique_vars = get_unique_vars(vars1, vars2);
+	auto matching1 = index_common_variables(vars1, common_vars);
+	auto matching2 = index_common_variables(vars2, common_vars);
+
+	sort(rel1, get_perm(vars1, common_vars));
+	sort(rel2, get_perm(vars2, common_vars));
+
+	Relation<int> join_rel(unique_vars.size());
+
 	auto it1 = rel1.begin();
 	auto it2 = rel2.begin();
 	while (it1 != rel1.end() && it2 != rel2.end()) {
 		int comp = compare_assignments(*it1, matching1, *it2, matching2);
 
-		if (comp < 0) it1++;
+		if (!consistent(*it1, vars1)) it1++;
+		else if (!consistent(*it2, vars2)) it2++;
+		else if (comp < 0) it1++;
 		else if (comp > 0) it2++;
-		else if (!consistent(*it1, var1)) it1++;
-		else if (!consistent(*it2, var2)) it2++;
 		else {
 			for (auto it3 = it2; it3 != rel2.end() && 
 			     compare_assignments(*it1, matching1, *it3, matching2) == 0;
 			     it3++)
-			     join_vector.push_back(std::make_pair(*it1, *it3));	
+			     join_rel.push_tuple(merge_reduce_tpls(*it1, *it2,
+			     			     vars1, vars2, unique_vars));	
 
 			it1++;
 		}
 	}
 
-	return join_vector;
+	return join_rel;
 }
 
 // TEST JOIN FUNCTION
+using namespace std;
+
+int main() {
+	string f1 = "input1.txt";
+	string f2 = "input2.txt";
+	Relation<int> r1(3);
+	Relation<int> r2(2);
+	read_file(f1, r1);
+	read_file(f2, r2);
+
+	string f3 = "output1.txt";
+	string f4 = "output2.txt";
+
+	write_file(f3, r1);
+	write_file(f4, r2);
+
+	vector<int> vars1{2, 1, 2};
+	vector<int> vars2{2, 3};
+
+	auto ans = join(r1, r2, vars1, vars2);
+	auto vars = get_unique_vars(vars1, vars2);
+	cout << "vars" << endl;
+	for (auto i : vars) cout << i << " "; cout << endl << endl;
+	cout << ans << endl;
+
+	return 0;
+}
+//
+// /* Test functions get_unique_vars and merge_reduce_tpls */
 // using namespace std;
+// int main()
+// {
+// 	vector<int> v1{1, 2, 3, 1, 4};
+// 	vector<int> tpl1{0, 1, 2, 0, 3};
+// 	vector<int> v2{6, 5, 3};
+// 	vector<int> tpl2{0, 4, 2};
 //
-// int main() {
-// 	string f1 = "input1.txt";
-// 	string f2 = "input2.txt";
-// 	Relation<int> r1(3);
-// 	Relation<int> r2(2);
-// 	read_file(f1, r1);
-// 	read_file(f2, r2);
+// 	auto ans = get_unique_vars(v1, v2);
+// 	auto ans2 = merge_reduce_tpls(tpl1, tpl2, v1, v2, ans);
 //
-// 	string f3 = "output1.txt";
-// 	string f4 = "output2.txt";
+// 	for (auto i : ans)
+// 		cout << i << " ";
+// 	cout << endl;
 //
-// 	write_file(f3, r1);
-// 	write_file(f4, r2);
-//
-// 	vector<int> vars1{2, 1, 2};
-// 	vector<int> vars2{2, 3};
-//
-// 	auto ans = join(r1, r2, vars1, vars2);
-//
-// 	for (auto par : ans) {
-// 		auto v1 = par.first;
-// 		for (auto i : v1) cout << i << " ";
-// 		cout << "| ";
-// 		auto v2 = par.second;
-// 		for (auto i : v2) cout << i << " ";
-// 		cout << endl;
-// 	}
+// 	for (auto i : ans2)
+// 		cout << i << " ";
+// 	cout << endl;
 //
 // 	return 0;
 // }
