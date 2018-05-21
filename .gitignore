@@ -1,5 +1,4 @@
-*.[o]
-main
-util
+bin/
 build/
-
+tests/join/in1.txt
+tests/join/in2.txt
