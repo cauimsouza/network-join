@@ -13,7 +13,7 @@ CXX_FLAGS := -std=c++11 -I $(HEADER_DIR)
 
 # Gather filenames
 
-SOURCES = $(shell find $(SRC_PATH) -name '*.cpp' | grep -v "main.cpp") # every cpp file in src
+SOURCES = $(shell find $(SRC_PATH) -name '*.cpp') # every cpp file in src
 OBJECTS = $(SOURCES:$(SRC_PATH)/%.cpp=$(BUILD_PATH)/%.o) # regex treatment to switch .cpp for .o
 
 # Recipes
@@ -25,10 +25,7 @@ all: $(BIN_DIR)/$(BIN_NAME) #compile main executable and create a shortcut in ro
 $(BIN_DIR)/$(BIN_NAME): $(OBJECTS) # main executable
 	$(CXX) $(CXX_FLAGS) $^ -o $@
 
-test_%: tests/**/test_%.cpp $(OBJECTS)
-	$(CXX) $(CXX_FLAGS) $^ -o $(BIN_DIR)/$@	
-
-bin/%: tests/**/%.cpp $(OBJECTS)
+test_join: tests/join/test_join.cpp $(OBJECTS)
 	$(CXX) $(CXX_FLAGS) $^ -o $@	
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp # source files
