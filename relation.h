@@ -32,6 +32,7 @@ public:
 	Relation& operator=(Relation&& rel) {
 		arity = rel.arity;
 		tuples = rel.tuples;
+		return *this;
 	}
 
 	/* destructors */
