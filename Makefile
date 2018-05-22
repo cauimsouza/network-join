@@ -5,6 +5,8 @@ SRC_DIR := src
 BUILD_DIR := build
 BIN_DIR := bin
 BIN_NAME := decide_later # name of the final file
+$(shell mkdir -p $(BUILD_DIR)) #create directories for building
+$(shell mkdir -p $(BIN_DIR)) 
 
 # Compiler settings
 
@@ -13,8 +15,8 @@ CXX_FLAGS := -std=c++11 -I $(HEADER_DIR)
 
 # Gather filenames
 
-SOURCES = $(shell find $(SRC_PATH) -name '*.cpp') # every cpp file in src
-OBJECTS = $(SOURCES:$(SRC_PATH)/%.cpp=$(BUILD_PATH)/%.o) # regex treatment to switch .cpp for .o
+SOURCES = $(shell find $(SRC_DIR) -name '*.cpp' | grep -v "main.cpp") # every cpp file in src
+OBJECTS = $(SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o) # regex treatment to switch .cpp for .o
 
 # Recipes
 
