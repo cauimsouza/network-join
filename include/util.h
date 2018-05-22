@@ -84,4 +84,19 @@ Relation<int> join(Relation<int>& rel1,
 		   Relation<int>& rel2,
 		   const std::vector<int>& var1,
      		   const std::vector<int>& var2);
+
+
+/*
+ * Performs join operation for multiple relations.
+ *
+ * @param relv 			vector of relations
+ * @param varsv 		vector of corresponding variables
+ * @param result_vars 	vector to identify variables in the resulting relation
+ * @return 				result of join operation as a new relation
+ */
+Relation<int> multiway_join(std::vector<Relation<int>>& relv,
+		   std::vector<std::vector<int>>& varsv,
+		   std::vector<int>& result_vars);
+
+
 #endif
