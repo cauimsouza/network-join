@@ -30,7 +30,7 @@ public:
 	using iterator = typename tuples_t::iterator;
 
 	/* constructors */	
-	explicit Relation(std::size_t n) : arity{n} {
+	Relation(std::size_t n = 1) : arity{n} {
 		if (n <= 0) throw std::invalid_argument("arity should be\
 				positive integer"); }
 
