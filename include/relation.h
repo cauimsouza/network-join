@@ -55,12 +55,6 @@ public:
 
 	void push_tuple(tuple_t tpl) { tuples.push_back(tpl); }
 
-	/* Concatenates a relation to this relation
-	 *
-	 * @param rel relation of same arity to be
-	 * 	  concatenated to this relation
-	 * @result this relation after the concatenation
-	 */
 	Relation<T>& concatenate(Relation<T> &rel);
 };
 
@@ -99,5 +93,4 @@ Relation<T>& Relation<T>::concatenate(Relation<T> &rel)
 	              rel.end());
 	return *this;
 }
-
 #endif
