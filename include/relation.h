@@ -48,12 +48,20 @@ public:
 	/* destructors */
 
 	/* member public functions */
-	std::size_t size() { return tuples.size(); }
-	std::size_t get_arity() { return arity; }
+	std::size_t size() const { return tuples.size(); }
+	std::size_t get_arity() const { return arity; }
 	iterator begin() { return tuples.begin(); }
 	iterator end() { return tuples.end(); }
 
 	void push_tuple(tuple_t tpl) { tuples.push_back(tpl); }
+
+	/* Concatenates a relation to this relation
+	 *
+	 * @param rel relation of same arity to be
+	 * 	  concatenated to this relation
+	 * @result this relation after the concatenation
+	 */
+	Relation<T>& concatenate(Relation<T> &rel);
 };
 
 /* copy assignment */
@@ -80,6 +88,15 @@ Relation<T>& Relation<T>::operator=(Relation &&rel) {
 	rel.arity = 0;
 	rel.tuples.clear();
 
+	return *this;
+}
+
+template<typename T>
+Relation<T>& Relation<T>::concatenate(Relation<T> &rel)
+{
+	tuples.insert(begin(),
+	              rel.begin(),
+	              rel.end());
 	return *this;
 }
 

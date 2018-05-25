@@ -72,6 +72,18 @@ std::vector<int> get_perm(const std::vector<int>& var_vect,
 			  const std::vector<int>& common_vect);
 
 /*
+ * Returns a (sorted) vector containing each element present in either
+ * vars1 or vars2, exactly once
+ *
+ * @param vars1 first vector of integers
+ * @param vars2 second vector of integers
+ * @return a vector containing each element in the union of 
+ * 	vars1 and vars2, exactly once
+ */
+std::vector<int> get_unique_vars(const std::vector<int>& vars1,
+				 const std::vector<int>& vars2);
+
+/*
  * Performs join operation in two relations.
  *
  * @param rel1 first relation
