@@ -2,21 +2,30 @@
 #define HASH_CPP
 
 #include <cmath>
+#include "MurmurHash3.h"
 
-inline unsigned mod_hash(unsigned k, unsigned size)
+inline unsigned mod_hash(unsigned key, unsigned size)
 {
-	return k % size;
+	return key % size;
 }
 
-inline unsigned mult_hash(unsigned k,
+inline unsigned mult_hash(unsigned key,
 		   unsigned size,
 		   double A = (std::sqrt(5) - 1)/2)
 {
-	double x = k * A;
+	double x = key * A;
 	x -= std::trunc(x);
 	x *= size;
 	
 	return (unsigned) std::trunc(x);
+}
+
+inline unsigned murmur_hash(unsigned key, unsigned size)
+{
+	unsigned result = 0;
+	MurmurHash3_x86_32(&key, sizeof key, 0, &result);
+
+	return result % size;
 }
 
 #endif
