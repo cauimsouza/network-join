@@ -3,6 +3,7 @@
 #include <boost/mpi/collectives.hpp>
 #include "ioutil.h"
 #include "util.h"
+#include "hash.h"
 #include "debug.h"
 
 namespace mpi = boost::mpi;
@@ -28,7 +29,9 @@ std::vector<Relation<int>> divide_tuples(Relation<int> &rel, int coord)
 	std::vector<Relation<int>> division_vector(world_size, Relation<int>(rel.get_arity()));
 	
 	for (auto it = rel.begin(); it != rel.end(); it++) {
-		int dst_id = (*it)[coord] % world_size;
+		int dst_id = mod_hash((*it)[coord], world_size);
+		// int dst_id = mult_hash((*it)[coord], world_size);
+		// int dst_id = (*it)[coord] % world_size;
 		division_vector[dst_id].push_tuple(*it);
 	}
 
@@ -76,15 +79,20 @@ Relation<int> distributed_join(Relation<int> &rel1,
 		auto common_vars = common_elems(vars1, vars2);
 		int coord1 = 0,
 		coord2 = 0;
-		for (std::size_t i = 0; i < vars1.size(); i++)
-			if (vars1[i] == common_vars[0])
-				coord1 = i;
-		for (std::size_t i = 0; i < vars2.size(); i++)
-			if (vars2[i] == common_vars[0])
-				coord2 = i;
+		if (common_vars.size() > 0) {
+			for (std::size_t i = 0; i < vars1.size(); i++)
+				if (vars1[i] == common_vars[0])
+					coord1 = i;
+			for (std::size_t i = 0; i < vars2.size(); i++)
+				if (vars2[i] == common_vars[0])
+					coord2 = i;
+		}
 
 		div1 = divide_tuples(rel1, coord1);
 		div2 = divide_tuples(rel2, coord2);
+
+		rel1.clear();
+		rel2.clear();
 	}
 
 	Relation<int> subrel1;
@@ -92,6 +100,10 @@ Relation<int> distributed_join(Relation<int> &rel1,
 	
 	mpi::scatter(world, div1, subrel1, root);
 	mpi::scatter(world, div2, subrel2, root);
+
+	std::cout << "process " << world.rank() << \
+		", " << subrel1.size() << ", " << \
+		subrel2.size() << std::endl;
 
 	auto partial_result = join(subrel1,
 				   subrel2,
@@ -125,7 +137,9 @@ Relation<int> distributed_multiway_join(std::vector<Relation<int>>& relv,
 
 	rel_it++;
 	vars_it++;
+	int round = 0;
 	while (rel_it != relv.end()) {
+		std::cout << round++ << " round" << std::endl;
 		result_rel = distributed_join(result_rel, *rel_it, result_vars, *vars_it);
 		result_vars = get_unique_vars(result_vars, *vars_it);
 
@@ -136,45 +150,90 @@ Relation<int> distributed_multiway_join(std::vector<Relation<int>>& relv,
 	return result_rel;
 }
 
-// int main() {
-// 	using namespace std;
-// 	mpi::environment env;
-// 	mpi::communicator world;
-// 	const int root = 0;
-//
-// 	Relation<int> r1(2);
-// 	Relation<int> r2(2);
-// 	Relation<int> r3(2);
-//
-// 	vector<int> v1{0, 1};
-// 	vector<int> v2{1, 2};
-// 	vector<int> v3{2, 3};
-//
-// 	string f1 = "input1.txt";
-// 	string f2 = "input2.txt";
-// 	string f3 = "input3.txt";
-//
-// 	if (world.rank() == root) {
-// 		read_file(f1, r1);
-// 		read_file(f2, r2);
-// 		read_file(f3, r3);
-// 	}
-//
-// 	vector<Relation<int>> relv{r1, r2, r3};
-// 	vector<vector<int>> varsv{v1, v2, v3};
-// 	vector<int> result_vars;
-// 	auto result = distributed_multiway_join(relv, varsv, result_vars);
-// 	if (world.rank() == root) {
-// 		pv(result_vars);
-// 		cout << endl;
-// 		for (auto it = result.begin(); it != result.end(); it++)
-// 			pv(*it);
-// 	}
-//
-// 	// auto result = distributed_join(r1, r2, v1, v2);
-//         //
-// 	// for (auto it = result.begin(); it != result.end(); it++)
-// 	// 	pv(*it);
-//
-// 	return 0;
-// }
+/*
+ * Performs join operation for multiple relations
+ * in a distributed fashion using Boost's MPI
+ * implementation
+ *
+ * @param relv vector of relations
+ * @param varsv vector of corresponding variables
+ * @param result_vars vector to identify variables in the resulting relation
+ * @return result of join operation as a new relation
+ */
+Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
+		   std::vector<std::vector<int>>& varsv,
+		   std::vector<int>& result_vars)
+{
+	mpi::communicator world;
+	const int root = 0;
+	auto rel_it = rel_namesv.begin();
+	auto vars_it = varsv.begin();
+	auto arity = read_arity(rel_namesv.front());
+	Relation<int> result_rel(arity);
+	Relation<int> aux_rel;
+	read_file(*rel_it, result_rel);
+	result_vars = *vars_it;
+
+	rel_it++;
+	vars_it++;
+	int round = 0;
+	while (rel_it != rel_namesv.end()) {
+		std::cout << round++ << " round" << std::endl;
+		if (world.rank() == root) {
+			aux_rel.clear();
+			aux_rel.set_arity(read_arity(*rel_it));
+			read_file(*rel_it, aux_rel);
+		}
+		result_rel = distributed_join(result_rel, aux_rel, result_vars, *vars_it);
+		result_vars = get_unique_vars(result_vars, *vars_it);
+
+		rel_it++;
+		vars_it++;
+	}
+
+	return result_rel;
+}
+
+int main() {
+	using namespace std;
+	mpi::environment env;
+	mpi::communicator world;
+	const int root = 0;
+
+	Relation<int> r1(2);
+	Relation<int> r2(2);
+	Relation<int> r3(2);
+
+	vector<int> v1{0, 1};
+	vector<int> v2{1, 2};
+	vector<int> v3{2, 1};
+
+	string f1 = "facebook.dat";
+	string f2 = "facebook.dat";
+	string f3 = "facebook.dat";
+
+	if (world.rank() == root) {
+		read_file(f1, r1);
+		read_file(f2, r2);
+		read_file(f3, r3);
+	}
+
+	vector<string> relv{f1, f2, f3};
+	vector<vector<int>> varsv{v1, v2, v3};
+	vector<int> result_vars;
+	auto result = distributed_multiway_join(relv, varsv, result_vars);
+	if (world.rank() == root) {
+		// pv(result_vars);
+		// cout << endl;
+		// for (auto it = result.begin(); it != result.end(); it++)
+		// 	pv(*it);
+		cout << result.size() << endl;
+	}
+
+	// auto result = distributed_join(r1, r2, v1, v2);
+        //
+	// for (auto it = result.begin(); it != result.end(); it++)
+	// 	pv(*it);
+
+	return 0;
+}

@@ -50,8 +50,10 @@ public:
 	/* member public functions */
 	std::size_t size() const { return tuples.size(); }
 	std::size_t get_arity() const { return arity; }
+	void set_arity(int arity) { this->arity = arity; }
 	iterator begin() { return tuples.begin(); }
 	iterator end() { return tuples.end(); }
+	void clear() { tuples.clear(); }
 
 	void push_tuple(tuple_t tpl) { tuples.push_back(tpl); }
 
