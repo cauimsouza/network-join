@@ -116,31 +116,42 @@ Relation<int> distributed_join(Relation<int> &rel1,
 	return result;
 }
 
+
 /*
  * Performs join operation for multiple relations
  * in a distributed fashion using Boost's MPI
  * implementation
  *
- * @param relv vector of relations
+ * @param rel_namesv vector containing relations' filenames
  * @param varsv vector of corresponding variables
  * @param result_vars vector to identify variables in the resulting relation
  * @return result of join operation as a new relation
  */
-Relation<int> distributed_multiway_join(std::vector<Relation<int>>& relv,
+Relation<int> distributed_multiway_join_simple(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
 		   std::vector<int>& result_vars)
 {
-	auto rel_it = relv.begin();
+	mpi::communicator world;
+	const int root = 0;
+	auto rel_it = rel_namesv.begin();
 	auto vars_it = varsv.begin();
-	Relation<int> result_rel = *rel_it;
+	auto arity = read_arity(rel_namesv.front());
+	Relation<int> result_rel(arity);
+	Relation<int> aux_rel;
+	read_file(*rel_it, result_rel);
 	result_vars = *vars_it;
 
 	rel_it++;
 	vars_it++;
 	int round = 0;
-	while (rel_it != relv.end()) {
+	while (rel_it != rel_namesv.end()) {
 		std::cout << round++ << " round" << std::endl;
-		result_rel = distributed_join(result_rel, *rel_it, result_vars, *vars_it);
+		if (world.rank() == root) {
+			aux_rel.clear();
+			aux_rel.set_arity(read_arity(*rel_it));
+			read_file(*rel_it, aux_rel);
+		}
+		result_rel = distributed_join(result_rel, aux_rel, result_vars, *vars_it);
 		result_vars = get_unique_vars(result_vars, *vars_it);
 
 		rel_it++;
@@ -150,3 +161,85 @@ Relation<int> distributed_multiway_join(std::vector<Relation<int>>& relv,
 	return result_rel;
 }
 
+/*
+ * Performs join operation for multiple relations
+ * in a distributed fashion using Boost's MPI
+ * implementation
+ *
+ * @param rel_namesv vector containing relations' filenames
+ * @param varsv vector of corresponding variables
+ * @param result_vars vector to identify variables in the resulting relation
+ * @return result of join operation as a new relation
+ */
+Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel_namesv,
+		   std::vector<std::vector<int>>& varsv,
+		   std::vector<int>& result_vars)
+{
+	throw("Not implemented yet");
+	Relation<int> result_rel;
+	return result_rel;
+}
+
+/*
+ * Performs join operation for multiple relations
+ * in a distributed fashion using Boost's MPI
+ * implementation
+ *
+ * @param rel_namesv vector containing relations' filenames
+ * @param varsv vector of corresponding variables
+ * @param result_vars vector to identify variables in the resulting relation
+ * @return result of join operation as a new relation
+ */
+Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
+		   std::vector<std::vector<int>>& varsv,
+		   std::vector<int>& result_vars, bool forward)
+{
+	if(forward)
+		return  distributed_multiway_join_forwarding(rel_namesv, varsv, result_vars);
+	return distributed_multiway_join_simple(rel_namesv, varsv, result_vars);
+}
+
+
+// int main() {
+// 	using namespace std;
+// 	mpi::environment env;
+// 	mpi::communicator world;
+// 	const int root = 0;
+//
+// 	Relation<int> r1(2);
+// 	Relation<int> r2(2);
+// 	Relation<int> r3(2);
+//
+// 	vector<int> v1{0, 1};
+// 	vector<int> v2{1, 2};
+// 	vector<int> v3{2, 1};
+//
+// 	string f1 = "facebook.dat";
+// 	string f2 = "facebook.dat";
+// 	string f3 = "facebook.dat";
+//
+// 	if (world.rank() == root) {
+// 		read_file(f1, r1);
+// 		read_file(f2, r2);
+// 		read_file(f3, r3);
+// 	}
+//
+// 	vector<string> relv{f1, f2, f3};
+// 	vector<vector<int>> varsv{v1, v2, v3};
+// 	vector<int> result_vars;
+// 	auto result = distributed_multiway_join(relv, varsv, result_vars);
+// 	if (world.rank() == root) {
+// 		// pv(result_vars);
+// 		// cout << endl;
+// 		// for (auto it = result.begin(); it != result.end(); it++)
+// 		// 	pv(*it);
+// 		cout << result.size() << endl;
+// 	}
+//
+// 	// auto result = distributed_join(r1, r2, v1, v2);
+//         //
+// 	// for (auto it = result.begin(); it != result.end(); it++)
+// 	// 	pv(*it);
+//
+// 	return 0;
+// }
