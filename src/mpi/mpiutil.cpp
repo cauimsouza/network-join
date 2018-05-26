@@ -125,9 +125,9 @@ Relation<int> distributed_join(Relation<int> &rel1,
 
 
 /*
- * Performs join operation for multiple relations
- * in a distributed fashion using Boost's MPI
- * implementation
+ * Auxiliary method for distributed_multiway_join. Performs multijoin
+ * in a non-optimized way (processes send their partial results to the
+ * root before the next join).
  *
  * @param rel_namesv vector containing relations' filenames
  * @param varsv vector of corresponding variables
@@ -168,9 +168,9 @@ Relation<int> distributed_multiway_join_simple(std::vector<std::string>& rel_nam
 }
 
 /*
- * Performs join operation for multiple relations
- * in a distributed fashion using Boost's MPI
- * implementation
+ * Auxiliary method for distributed_multiway_join. Performs multijoin
+ * in an optimized way (processes scatter their partial results directly
+ * to the appropriate machines for the next join).
  *
  * @param rel_namesv vector containing relations' filenames
  * @param varsv vector of corresponding variables
@@ -194,6 +194,7 @@ Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel
  * @param rel_namesv vector containing relations' filenames
  * @param varsv vector of corresponding variables
  * @param result_vars vector to identify variables in the resulting relation
+ * @param forward flag to enable auto-forward optimization
  * @return result of join operation as a new relation
  */
 Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
