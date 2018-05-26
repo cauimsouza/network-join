@@ -10,29 +10,28 @@
 #include "util.h"
 #include "debug.h"
 
-int main() {
+int main(int argc, char* argv[]) {
 	using namespace std;
+
+	const string PATH_INPUTS("tests/mpi_simple/test_cases/");
+	
+	if(argc !=2)
+	{
+		cout<<"Enter the name of the desired input";
+		return -1;
+	}
+	
 	mpi::environment env;
 	mpi::communicator world;
-	const int root = 0;
+	vector<int> v1{0, 1}, v2{2, 3}, v5{4, 0}, v3{1, 2}, v4{3, 4};
+	string f1, f2, f3, f4, f5;
+	f1=f2=f3=f4=f5= PATH_INPUTS+string(argv[1]);
 
-	Relation<int> r1(2);
-	Relation<int> r2(2);
-	Relation<int> r3(2);
-
-	vector<int> v1{0, 1};
-	vector<int> v2{1, 2};
-	vector<int> v3{2, 3};
-
-	string f1 = "tests/mpi_simple/test_cases/input1.txt";
-	string f2 = "tests/mpi_simple/test_cases/input2.txt";
-	string f3 = "tests/mpi_simple/test_cases/input3.txt";
-
-	vector<string> relv; relv.push_back(f1);relv.push_back(f2);relv.push_back(f3);
-	vector< vector<int> > varsv{v1, v2, v3};
+	vector<string> relv{f1,f2,f3,f4, f5};
+	vector< vector<int> > varsv{v1,v2,v3,v4, v5};
 	vector<int> result_vars;
 	auto result = distributed_multiway_join(relv, varsv, result_vars, false);
-	if (world.rank() == root) {
+	if (world.rank() == constants::ROOT) {
 		pv(result_vars);
 		cout << endl;
 		for (auto it = result.begin(); it != result.end(); it++)

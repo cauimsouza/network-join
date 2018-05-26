@@ -1,4 +1,8 @@
 namespace mpi = boost::mpi;
+namespace constants{
+	const int NONE = -1; // signalize when there are no common variables
+	const int ROOT = 0; // signalize when there are no common variables
+}
 
 /* Performs join operation in a distributed fashion
  * using Boost's MPI interface.
