@@ -1,3 +1,9 @@
+#ifndef MPIUTIL_H
+#define MPIUTIL_H
+
+#include <boost/mpi.hpp> 
+#include "relation.h"
+
 namespace mpi = boost::mpi;
 namespace constants{
 	const int NONE = -1; // signalize when there are no common variables
@@ -47,3 +53,5 @@ Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
 Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
 		   std::vector<int>& result_vars);
+
+#endif

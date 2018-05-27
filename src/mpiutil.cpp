@@ -1,5 +1,5 @@
 #include <vector>
-#include<functional>
+#include <functional>
 #include <boost/mpi.hpp>
 #include <boost/mpi/collectives.hpp>
 #include "ioutil.h"
