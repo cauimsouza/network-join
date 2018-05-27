@@ -1,4 +1,5 @@
 #include <vector>
+#include<functional>
 #include <boost/mpi.hpp>
 #include <boost/mpi/collectives.hpp>
 #include "ioutil.h"
@@ -8,11 +9,10 @@
 #include "debug.h"
 
 /*
- * This function takes a relation of integer tuples and divide it
+ * This function takes a relation of integer tuples and divides it
  * into nproc relations, where nproc is the number of processes.
- * A tuple tpl is assigned to the relation of index equals to 
- * tpl[coord] % nproc, where tpl[coord] is the value of the 
- * coord-th coordinate of the tpl.
+ * A tuple tpl is assigned to a certain relation according to a 
+ * reference variable of the tuple (coord) and a given hash function.
  *
  * @param rel original relation to be divided into nproc relations
  * @param coord coordinate according to which the tuples will be
@@ -266,4 +266,164 @@ Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
 	return distributed_multiway_join_simple(rel_namesv, varsv, result_vars);
 }
 
+/*
+ * Divides the total number of processes into k factors
+ * (where k is the number of distinct variables in the join), 
+ * trying to keep such factors close. In particular, we minimize 
+ * the sum of the factors using dynamic programming.
+ *
+ * @param num_procs number of processes
+ * @param num_vars number of distinct variales in the multiway join
+ * @return vector of factors
+ */
+std::vector<int> equally_factorize(int num_procs, int num_vars){
+	using namespace std; 
+	using Cell = pair<int, vector<int> >;
 
+	Cell empty_cell(-1, vector<int>());
+	vector<vector<Cell> > memo(num_procs+1, vector<Cell>(num_vars+1, empty_cell));
+
+	
+	function<Cell(int,int)> dp = [&dp, &memo](int num_procs, int num_vars){		
+		const int INF = numeric_limits<int>().max();
+		if (num_vars==1)
+        	return Cell(num_procs,vector<int>(1, num_procs));	
+
+        if (memo[num_procs][num_vars].first==-1)
+	    {
+		    int best_cost = INF;
+		    vector<int> best_factors;
+		    for(int i=1; i * i <= num_procs; i++){
+		        if (num_procs % i == 0){
+		            Cell sub_result= dp(num_procs / i, num_vars - 1);
+		            if (sub_result.first + i <= best_cost){
+		                best_cost = sub_result.first + i;
+		                best_factors = sub_result.second; best_factors.push_back(i);
+		            }
+		        }
+			}
+		    memo[num_procs][num_vars].first = best_cost;
+		    memo[num_procs][num_vars].second = best_factors;
+	    } 
+    	return memo[num_procs][num_vars];
+	};
+
+	return dp(num_procs, num_vars).second;   
+}      
+/*
+ * Function that calculates the indices (0 to num_procs-1) of all processes to whom we should send
+ * a certain tuple during the hypercube algorithm
+ *
+ * @param tuple the tuple we want to send
+ * @param vars vector indicating the corresponding vars of the tuple
+ * @param address_limits vector with the limits of each coordinate in the vector form of a process' address
+ * @param destinations reference to vector where we will store the result
+ */
+void calculate_destinations(Relation<int>::tuple_t& tuple, std::vector<int>& vars, std::vector<int>& address_limits, 
+	 std::vector<int>& destinations){	
+	// given a vector (x1, ..., xk) where 0<=xi<mi, we can map it uniquely to  {0, ... , m1*...*mk-1}
+	// by doing h(x1, ... , xk) = x1+m1*x2+m1*m2*x3+..., which can be calculated recursively
+	// through s_k = s_(k-1)*m_k+x_k
+
+	std::function<void(int, int)> recursive_calc = 
+	[&tuple,&vars,&address_limits,&destinations, &recursive_calc](int var_index, int curr_sum){
+		if(var_index==-1) // if I've already chosen every entry in the address, curr_sum stores the process rank
+			destinations.push_back(curr_sum);
+		else if(find(vars.begin(), vars.end(), var_index)!=vars.end()){ // if this is one the variables, use hash to decide x_k
+			int coord = find(vars.begin(), vars.end(), var_index)-vars.begin();
+			int r = mod_hash(tuple[coord], address_limits[var_index]);
+			recursive_calc(var_index-1, r+address_limits[var_index]*curr_sum);
+		}
+		else
+		{
+			for(int i=0; i<address_limits[var_index]; i++)
+				recursive_calc(var_index-1, i+address_limits[var_index]*curr_sum);
+		}
+
+	};
+	int num_vars = address_limits.size(); // number of distinct variables
+	recursive_calc(num_vars-1, 0);
+}
+/*
+ * Function that splits a relation according to the hypercube algorithm
+ *
+ * @param rel the relation we want to split
+ * @param divided_rel reference to vector of relations where we will store the result,i.e., the splitted relations
+ * @param vars vector indicating the corresponding vars of the tuple
+ * @param address_limits vector with the limits of each coordinate in the vector form of a process' address
+ */
+void hypercube_divide_tuples(Relation<int>& rel, std::vector<Relation<int>>& divided_rel,
+	std::vector<int>& vars, std::vector<int>& address_limits)
+		
+{	
+		for(auto tuple : rel)
+		{
+			std::vector<int> destinations;
+			calculate_destinations(tuple,vars,address_limits,destinations);
+			for(int dest:destinations){
+				divided_rel[dest].push_tuple(tuple);
+			}
+		}
+}
+
+/*
+ * Performs join operation for multiple relations
+ * in a distributed fashion using Boost's MPI
+ * implementation, by applying the hypercube algorithm
+ *
+ * @param rel_namesv vector containing relations' filenames
+ * @param varsv vector of corresponding variables
+ * @param result_vars vector to identify variables in the resulting relation
+ * @param forward flag to enable auto-forward optimization
+ * @return result of join operation as a new relation
+ */
+Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_namesv,
+		   std::vector<std::vector<int>>& varsv,
+		   std::vector<int>& result_vars)
+{
+	mpi::communicator world;
+	int num_procs = world.size();
+	std::vector<int> address_limits;
+	if(world.rank()==constants::ROOT){
+		result_vars = varsv.front();
+		for(auto vars_it=++varsv.begin();vars_it!=varsv.end(); vars_it++)
+			result_vars= get_unique_vars(result_vars, *vars_it);
+		int num_vars =result_vars.size();
+		address_limits = equally_factorize(num_procs, num_vars);
+	}
+	//divide first relation to initialize local_result_rel
+	Relation<int> local_result_rel; std::vector<int> local_vars=varsv.front();
+	std::vector<Relation<int>> divided_buff_rel;
+	if (world.rank() == constants::ROOT) {
+			Relation<int> buff_rel;			
+			buff_rel.set_arity(read_arity(rel_namesv.front()));
+			read_file(rel_namesv.front(), buff_rel); 
+			divided_buff_rel.assign(num_procs, Relation<int>(buff_rel.get_arity()));
+			hypercube_divide_tuples(buff_rel, divided_buff_rel, varsv.front(), address_limits);
+	}
+	// scatter from divided_buff_rel to local_result_rel
+	mpi::scatter(world, divided_buff_rel, local_result_rel, constants::ROOT);
+
+	auto rel_it = ++rel_namesv.begin(); auto vars_it = ++varsv.begin();
+	for(;rel_it!=rel_namesv.end();rel_it++,vars_it++) {		
+		Relation<int> local_buff_rel;
+		if (world.rank() == constants::ROOT) {
+			Relation<int> buff_rel;			
+			buff_rel.set_arity(read_arity(*rel_it));
+			read_file(*rel_it, buff_rel);
+			divided_buff_rel.assign(num_procs, Relation<int>(buff_rel.get_arity()));
+			hypercube_divide_tuples(buff_rel, divided_buff_rel, *vars_it, address_limits);
+		}	
+		//scatter from divided_buff_rel to local_buff_rel
+		mpi::scatter(world, divided_buff_rel, local_buff_rel, constants::ROOT);
+		//join local_result_rel to the relation that was read and divided
+		local_result_rel = join(local_result_rel, local_buff_rel, local_vars, *vars_it);	
+		local_vars = get_unique_vars(local_vars, *vars_it);
+	}
+	// combine all local results
+	Relation<int> result_rel;	
+	mpi::reduce(world, local_result_rel, result_rel, concatenate_functor<int>(), constants::ROOT);
+
+	return result_rel;
+	
+}

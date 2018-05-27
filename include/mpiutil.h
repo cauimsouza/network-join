@@ -32,3 +32,18 @@ Relation<int> distributed_join(Relation<int> &rel1,
 Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
 		   std::vector<int>& result_vars, bool forward=true);
+
+/*
+ * Performs join operation for multiple relations
+ * in a distributed fashion using Boost's MPI
+ * implementation, by applying the hypercube algorithm
+ *
+ * @param rel_namesv vector containing relations' filenames
+ * @param varsv vector of corresponding variables
+ * @param result_vars vector to identify variables in the resulting relation
+ * @param forward flag to enable auto-forward optimization
+ * @return result of join operation as a new relation
+ */
+Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_namesv,
+		   std::vector<std::vector<int>>& varsv,
+		   std::vector<int>& result_vars);
