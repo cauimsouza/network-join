@@ -1,0 +1,6 @@
+5
+2 pentagon.txt 0 1
+2 pentagon.txt 1 2
+2 pentagon.txt 2 3
+2 pentagon.txt 3 4
+2 pentagon.txt 4 0

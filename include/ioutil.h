@@ -10,8 +10,8 @@ std::ostream& operator<<(std::ostream& os, Relation<int>& rel);
 
 std::size_t read_arity(std::string& filename);
 
-void read_file(std::string& filename, Relation<int>& rel);
+void read_relation(std::string& filename, Relation<int>& rel);
 
-void write_file(const std::string& filename, Relation<int>& rel);
+void write_relation(const std::string& filename, Relation<int>& rel);
 
 #endif

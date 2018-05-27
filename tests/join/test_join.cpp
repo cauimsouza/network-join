@@ -1,38 +1,135 @@
 /*
-* this file tests the join function
+*
+* this file tests the join operation for the different join methods
 */
-
-#include <iostream>
-#include <algorithm>
-#include "relation.h"
+#include <fstream>
+#include <vector>
+#include <boost/mpi.hpp>
+#include <boost/mpi/collectives.hpp>
 #include "ioutil.h"
+#include "mpiutil.h"
 #include "util.h"
-#include <string>
+#include "debug.h"
 
-int main(int argc, char** argv)
+using namespace std;
+
+const string RELATIONS_PATH("tests/join/relations/");
+const string INPUTS_PATH("tests/join/inputs/");
+const string ANSWERS_PATH("tests/join/outputs/");
+
+void read_test(const string filename, vector<string>& rel_namesv, vector<vector<int>>& varsv)
 {
-	if(argc!=2)
+	ifstream f(filename);
+	if(!f)
 	{
-		std::cout<<"Usage: bin/test_join <test name>";
+		mpi::communicator world;
+		if(world.rank()==constants::ROOT){
+			cout<<"###################"<<endl;
+			cout<<"File not found, terminating program"<<endl;
+			cout<<"###################"<<endl;	
+		}
+		exit(-1);
+	}
+	int num_rels;
+	f>>num_rels;
+	rel_namesv.resize(num_rels); varsv.resize(num_rels);
+	for(int i=0; i<num_rels; i++)
+	{
+		int arity; f>>arity; varsv[i].resize(arity);
+		string rel_filename; f>>rel_filename;
+		rel_namesv[i]=RELATIONS_PATH+rel_filename;
+		for(int j=0; j<arity; j++)
+			f>>varsv[i][j];
+	}
+	f.close();
+}
+
+int main(int argc, char* argv[]) {
+
+	mpi::communicator world;
+	mpi::environment env;
+
+	if(argc !=3)
+	{
+		if(world.rank() == constants::ROOT){
+			cout<<"###################"<<endl;
+			cout<<"Usage: mpirun -np <number of processes> bin/test_join <name of input> <0:sequential, 1:normal distrib, 2:optimized distrib, 3: hypercube>"<<endl;
+			cout<<"###################"<<endl;
+		}
 		return -1;
 	}
-	std::string test_path="tests/join/test_cases/";
-	std::string test_name(argv[1]); // Ex: "both_on_top"
-	std::string input1 = test_path+test_name+"_in1.txt",
-			input2 = test_path+test_name+"_in2.txt",
-			output = test_path+test_name+"_out.txt";
+	
+	vector<string> rel_namesv;
+	vector< vector<int> > varsv;
 
-	auto sz1= read_arity(input1), sz2 = read_arity(input2);
-	Relation<int> r1(sz1); Relation<int> r2(sz2);
-	read_file(input1, r1); read_file(input2, r2);
+	
+	read_test(INPUTS_PATH+string(argv[1]), rel_namesv, varsv);
 
-	std::vector<int> vars1={1, 2};
-	std::vector<int> vars2={1, 3};
 
-	Relation<int> r = join(r1, r2, vars1,  vars2);
-	std::cout<<r;
-	std::cout<<"-----------"<<std::endl;
-	system((std::string("cat ")+output).data());
+	vector<int> result_vars;
+	int algorithm_option = atoi(argv[2]);
+	Relation<int> result;
+	switch(algorithm_option){
+		case 0:
+			result = multiway_join(rel_namesv, varsv, result_vars);
+			break;
+		case 1:
+			result = distributed_multiway_join(rel_namesv, varsv, result_vars, false);
+			break;
+		case 2:
+			result = distributed_multiway_join(rel_namesv, varsv, result_vars, true);
+			break;
+		case 3:
+			result = hypercube_distributed_multiway_join(rel_namesv, varsv, result_vars);
+			break;
+		default:
+			if(world.rank() == constants::ROOT){
+			cout<<"###################"<<endl;
+			cout<<"Wrong algorithm option. <0:sequential, 1:normal distrib, 2:optimized distrib, 3: hypercube>"<<endl;
+			cout<<"###################"<<endl;
+			}
+			return -1;
+	}
 
-	return 0;	
+
+	if (world.rank() == constants::ROOT) {
+		pv(result_vars);
+		cout << endl;
+		for (auto it = result.begin(); it != result.end(); it++)
+			pv(*it);
+
+		// verify answer
+
+		string answer_filename = ANSWERS_PATH+string(argv[1]);
+		Relation<int> right_answer(read_arity(answer_filename));
+		read_relation(answer_filename, right_answer);
+
+		map<vector<int>, int> m1, m2;
+		for(auto tuple : right_answer)
+		{
+			if(m1.count(tuple))
+				m1[tuple]++;
+			else
+				m1[tuple]=1;
+		}
+
+		for(auto tuple : result)
+		{
+			if(m2.count(tuple))
+				m2[tuple]++;
+			else
+				m2[tuple]=1;
+		}
+		cout<<"------"<<endl;
+		cout<<right_answer<<endl;
+		cout<<"------"<<endl;
+		if (m1.size() == m2.size() && std::equal(m1.begin(), m1.end(),m2.begin())){
+			cout<<"Answer is CORRECT"<<endl;
+		}
+		else
+			cout<<"Answer is WRONG"<<endl;
+	}
+
+
+	return 0;
 }

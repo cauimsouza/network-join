@@ -140,7 +140,7 @@ Relation<int> distributed_multiway_join_simple(std::vector<std::string>& rel_nam
 	auto arity = read_arity(rel_namesv.front());
 	Relation<int> result_rel(arity);
 	Relation<int> aux_rel;
-	read_file(*rel_it, result_rel);
+	read_relation(*rel_it, result_rel);
 	result_vars = *vars_it;
 
 	rel_it++;
@@ -150,7 +150,7 @@ Relation<int> distributed_multiway_join_simple(std::vector<std::string>& rel_nam
 		if (world.rank() == constants::ROOT) {
 			aux_rel.clear();
 			aux_rel.set_arity(read_arity(*rel_it));
-			read_file(*rel_it, aux_rel);
+			read_relation(*rel_it, aux_rel);
 		}
 		result_rel = distributed_join(result_rel, aux_rel, result_vars, *vars_it);
 		result_vars = get_unique_vars(result_vars, *vars_it);
@@ -183,7 +183,7 @@ Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel
 	Relation<int> left_subrel(read_arity(rel_namesv.front())); // stores the remainings of the previous join 
 	std::vector<int> left_vars=*vars_it; // cumulates the unique variables as we go on		
 	if(world.rank()==constants::ROOT){ // the root process starts with the entire first relation, which will be distributed in Part 2 
-		read_file(*rel_it, left_subrel);
+		read_relation(*rel_it, left_subrel);
 	} 	
 	rel_it++; // start from second relation
 	vars_it++;	
@@ -194,7 +194,7 @@ Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel
 		if (world.rank() == constants::ROOT) { 
 			buff_rel.clear();
 			buff_rel.set_arity(read_arity(*rel_it));
-			read_file(*rel_it, buff_rel);		
+			read_relation(*rel_it, buff_rel);		
 			auto common_vars = common_elems(left_vars, right_vars); //calculate common variables
 			// decide reference variable for division
 			if(find(common_vars.begin(), common_vars.end(), prev_division_var)!=common_vars.end()) // if our division is still valid, keep it
@@ -397,7 +397,7 @@ Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_
 	if (world.rank() == constants::ROOT) {
 			Relation<int> buff_rel;			
 			buff_rel.set_arity(read_arity(rel_namesv.front()));
-			read_file(rel_namesv.front(), buff_rel); 
+			read_relation(rel_namesv.front(), buff_rel); 
 			divided_buff_rel.assign(num_procs, Relation<int>(buff_rel.get_arity()));
 			hypercube_divide_tuples(buff_rel, divided_buff_rel, varsv.front(), address_limits);
 	}
@@ -410,7 +410,7 @@ Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_
 		if (world.rank() == constants::ROOT) {
 			Relation<int> buff_rel;			
 			buff_rel.set_arity(read_arity(*rel_it));
-			read_file(*rel_it, buff_rel);
+			read_relation(*rel_it, buff_rel);
 			divided_buff_rel.assign(num_procs, Relation<int>(buff_rel.get_arity()));
 			hypercube_divide_tuples(buff_rel, divided_buff_rel, *vars_it, address_limits);
 		}	

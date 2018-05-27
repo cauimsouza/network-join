@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 
 	auto sz= read_arity(input);
 	Relation<int> graph(sz); 
-	read_file(input, graph); 
+	read_relation(input, graph); 
 
 
 	// setting list of variables

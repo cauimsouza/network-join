@@ -251,120 +251,29 @@ Relation<int> join(Relation<int>& rel1,
 /*
  * Performs join operation for multiple relations.
  *
- * @param relv vector of relations
+ * @param rel_namesv vector containing the names of relation files
  * @param varsv	vector of corresponding variables
  * @param result_vars vector to identify variables in the resulting relation
  * @return result of join operation as a new relation
  */
-Relation<int> multiway_join(std::vector<Relation<int>>& relv,
+Relation<int> multiway_join(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
 		   std::vector<int>& result_vars)
 {
-	auto rel_it = relv.begin();
-	auto vars_it = varsv.begin();
-	Relation<int> result_rel = *rel_it;
-	result_vars = *vars_it;
+	
+	Relation<int> result_rel(read_arity(rel_namesv.front()));
+	read_relation(rel_namesv.front(),  result_rel);
+	result_vars = varsv.front();
 
-	rel_it++;
-	vars_it++;
-	while (rel_it != relv.end()) {
-		result_rel = join(result_rel, *rel_it, result_vars, *vars_it);
-		result_vars = get_unique_vars(result_vars, *vars_it);
-
-		rel_it++;
-		vars_it++;
+	auto rel_it = ++rel_namesv.begin();
+	auto vars_it = ++varsv.begin();
+	for(;rel_it != rel_namesv.end();rel_it++,vars_it++) {
+		Relation<int> buff_rel(read_arity(*rel_it));
+		read_relation(*rel_it, buff_rel);
+		result_rel = join(result_rel, buff_rel, result_vars, *vars_it);
+		result_vars = get_unique_vars(result_vars, *vars_it);	
 	}
 
 	return result_rel;
 }
 
-// using namespace std;
-// int main()
-// {
-// 	string f1 = "input1.txt";
-// 	string f2 = "input2.txt";
-// 	string f3 = "input3.txt";
-//
-// 	Relation<int> r1(2);
-// 	Relation<int> r2(2);
-// 	Relation<int> r3(2);
-//
-// 	read_file(f1, r1);
-// 	read_file(f2, r2);
-// 	read_file(f3, r3);
-//
-// 	vector<int> vars1{1, 2};
-// 	vector<int> vars2{2, 3};
-// 	vector<int> vars3{3, 1};
-//
-// 	vector<Relation<int>> relv;
-// 	relv.push_back(r1);
-// 	relv.push_back(r2);
-// 	relv.push_back(r3);
-// 	vector<vector<int>> varsv{vars1, vars2, vars3};
-//
-// 	vector<int> result_vars;
-//
-// 	Relation<int> rel = multiway_join(relv, varsv, result_vars);
-//
-// 	pv(result_vars);
-// 	p("");
-// 	for (auto tpl : rel) {
-// 		pv(tpl);
-// 	}
-//
-// 	return 0;
-// }
-
-
-// TEST JOIN FUNCTION
-// using namespace std;
-//
-// int main() {
-// 	string f1 = "input1.txt";
-// 	string f2 = "input2.txt";
-// 	Relation<int> r1(3);
-// 	Relation<int> r2(2);
-// 	read_file(f1, r1);
-// 	read_file(f2, r2);
-//
-// 	string f3 = "output1.txt";
-// 	string f4 = "output2.txt";
-//
-// 	write_file(f3, r1);
-// 	write_file(f4, r2);
-//
-// 	vector<int> vars1{2, 1, 2};
-// 	vector<int> vars2{2, 3};
-//
-// 	auto ans = join(r1, r2, vars1, vars2);
-// 	auto vars = get_unique_vars(vars1, vars2);
-// 	cout << "vars" << endl;
-// 	for (auto i : vars) cout << i << " "; cout << endl << endl;
-// 	cout << ans << endl;
-//
-// 	return 0;
-// }
-//
-// /* Test functions get_unique_vars and merge_reduce_tpls */
-// using namespace std;
-// int main()
-// {
-// 	vector<int> v1{1, 2, 3, 1, 4};
-// 	vector<int> tpl1{0, 1, 2, 0, 3};
-// 	vector<int> v2{6, 5, 3};
-// 	vector<int> tpl2{0, 4, 2};
-//
-// 	auto ans = get_unique_vars(v1, v2);
-// 	auto ans2 = merge_reduce_tpls(tpl1, tpl2, v1, v2, ans);
-//
-// 	for (auto i : ans)
-// 		cout << i << " ";
-// 	cout << endl;
-//
-// 	for (auto i : ans2)
-// 		cout << i << " ";
-// 	cout << endl;
-//
-// 	return 0;
-// }

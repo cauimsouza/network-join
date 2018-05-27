@@ -51,14 +51,14 @@ std::size_t read_arity(std::string& filename)
 	return arity;
 }
 
-void read_file(std::string& filename, Relation<int>& rel)
+void read_relation(std::string& filename, Relation<int>& rel)
 {
 	std::ifstream ifs(filename);
 	ifs >> rel;
 	ifs.close();
 }
 
-void write_file(const std::string& filename, Relation<int>& rel)
+void write_relation(const std::string& filename, Relation<int>& rel)
 {
 	std::ofstream ofs(filename);
 	ofs << rel;
