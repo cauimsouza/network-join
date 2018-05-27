@@ -108,10 +108,6 @@ Relation<int> distributed_join(Relation<int> &rel1,
 	mpi::scatter(world, div1, subrel1, constants::ROOT);
 	mpi::scatter(world, div2, subrel2, constants::ROOT);
 
-	std::cout << "process " << world.rank() << \
-		", " << subrel1.size() << ", " << \
-		subrel2.size() << std::endl;
-
 	auto partial_result = join(subrel1,
 				   subrel2,
 				   vars1,
@@ -151,7 +147,6 @@ Relation<int> distributed_multiway_join_simple(std::vector<std::string>& rel_nam
 	vars_it++;
 	int round = 0;
 	while (rel_it != rel_namesv.end()) {
-		std::cout << round++ << " round" << std::endl;
 		if (world.rank() == constants::ROOT) {
 			aux_rel.clear();
 			aux_rel.set_arity(read_arity(*rel_it));
@@ -181,8 +176,73 @@ Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel
 		   std::vector<std::vector<int>>& varsv,
 		   std::vector<int>& result_vars)
 {
-	throw("Not implemented yet");
+	mpi::communicator world;
+	auto rel_it = rel_namesv.begin();
+	auto vars_it = varsv.begin();
+	Relation<int> buff_rel; // stores the read relation
+	Relation<int> left_subrel(read_arity(rel_namesv.front())); // stores the remainings of the previous join 
+	std::vector<int> left_vars=*vars_it; // cumulates the unique variables as we go on		
+	if(world.rank()==constants::ROOT){ // the root process starts with the entire first relation, which will be distributed in Part 2 
+		read_file(*rel_it, left_subrel);
+	} 	
+	rel_it++; // start from second relation
+	vars_it++;	
+	// for each relation, calculate distributed binary join with optimization
+	for(int curr_division_var = constants::NONE, prev_division_var = constants::NONE; rel_it != rel_namesv.end();){ 
+		///////// Pt1: scatter the read relation to right_subrel
+		std::vector<Relation<int> > divided_buff_rel; std::vector<int> & right_vars = *vars_it;
+		if (world.rank() == constants::ROOT) { 
+			buff_rel.clear();
+			buff_rel.set_arity(read_arity(*rel_it));
+			read_file(*rel_it, buff_rel);		
+			auto common_vars = common_elems(left_vars, right_vars); //calculate common variables
+			// decide reference variable for division
+			if(find(common_vars.begin(), common_vars.end(), prev_division_var)!=common_vars.end()) // if our division is still valid, keep it
+				curr_division_var = prev_division_var;
+			else // otherwise we need to find new reference variable
+			{
+				if(common_vars.size()>0)
+					curr_division_var = common_vars[0];
+				
+				else // there may be none
+					curr_division_var = constants::NONE;				
+			}
+			int division_index = (curr_division_var==constants::NONE)? 
+				constants::NONE : std::find(right_vars.begin(),right_vars.end(),curr_division_var)-right_vars.begin();
+			divided_buff_rel = divide_tuples(buff_rel, division_index);
+		}		
+		mpi::broadcast(world, curr_division_var, constants::ROOT);
+		Relation<int> right_subrel;
+		mpi::scatter(world, divided_buff_rel, right_subrel, constants::ROOT);
+
+		///////// Pt2: scatter the remainings (left_subrel) to the appropriate machines
+		if(curr_division_var != prev_division_var) // we only have to scatter if previous division is now invalid
+		{
+			Relation<int> prev_left_subrel = left_subrel; //backup data, so we can distribute it
+			std::vector<Relation<int>> divided_prev_left_rel;
+			int division_index = (curr_division_var==constants::NONE)?
+				constants::NONE : std::find(left_vars.begin(),left_vars.end(),curr_division_var)-left_vars.begin();
+			divided_prev_left_rel=divide_tuples(prev_left_subrel, division_index);			
+			for(int i=0; i<world.size(); i++){
+				mpi::reduce(world, divided_prev_left_rel[i], left_subrel, concatenate_functor<int>(), i);
+			}			
+		}		
+		////////  Pt 3 Calculate the binary join of left_subrel and right_subrel
+		left_subrel = join(left_subrel,
+					   right_subrel,
+					   left_vars,
+					   right_vars);	
+		// loop update
+		rel_it++;
+		vars_it++;
+		left_vars = get_unique_vars(left_vars, right_vars);
+		prev_division_var=curr_division_var;
+	}
+
 	Relation<int> result_rel;
+	reduce(world, left_subrel, result_rel, concatenate_functor<int>(), constants::ROOT);
+	result_vars = std::vector<int>(left_vars);
+
 	return result_rel;
 }
 
@@ -207,45 +267,3 @@ Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
 }
 
 
-// int main() {
-// 	using namespace std;
-// 	mpi::environment env;
-// 	mpi::communicator world;
-//
-// 	Relation<int> r1(2);
-// 	Relation<int> r2(2);
-// 	Relation<int> r3(2);
-//
-// 	vector<int> v1{0, 1};
-// 	vector<int> v2{1, 2};
-// 	vector<int> v3{2, 1};
-//
-// 	string f1 = "facebook.dat";
-// 	string f2 = "facebook.dat";
-// 	string f3 = "facebook.dat";
-//
-// 	if (world.rank() == constants::ROOT) {
-// 		read_file(f1, r1);
-// 		read_file(f2, r2);
-// 		read_file(f3, r3);
-// 	}
-//
-// 	vector<string> relv{f1, f2, f3};
-// 	vector<vector<int>> varsv{v1, v2, v3};
-// 	vector<int> result_vars;
-// 	auto result = distributed_multiway_join(relv, varsv, result_vars);
-// 	if (world.rank() == constants::ROOT) {
-// 		// pv(result_vars);
-// 		// cout << endl;
-// 		// for (auto it = result.begin(); it != result.end(); it++)
-// 		// 	pv(*it);
-// 		cout << result.size() << endl;
-// 	}
-//
-// 	// auto result = distributed_join(r1, r2, v1, v2);
-//         //
-// 	// for (auto it = result.begin(); it != result.end(); it++)
-// 	// 	pv(*it);
-//
-// 	return 0;
-// }

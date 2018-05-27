@@ -3,6 +3,7 @@
 HEADER_DIR := include
 SRC_DIR := src
 BUILD_DIR := build
+LIB_DIR := lib
 BIN_DIR := bin
 BIN_NAME := decide_later # name of the final file
 
@@ -12,19 +13,22 @@ $(shell mkdir -p $(BUILD_DIR)/common) #create directories for building
 $(shell mkdir -p $(BUILD_DIR)/mpi) #create directories for building
 $(shell mkdir -p $(BIN_DIR)) 
 
-# Compiler settings
-
-CXX := g++ 
-MPI_CXX := mpic++
-CXX_FLAGS := -std=c++11 -I $(HEADER_DIR)
-MPI_CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -lboost_serialization -lboost_mpi
-
 # Gather filenames
 
 COMMON_SOURCES = $(shell find $(SRC_DIR)/common -name '*.cpp') # cpp files that are used both in sequential and mpi executions
 COMMON_OBJECTS = $(COMMON_SOURCES:$(SRC_DIR)/common/%.cpp=$(BUILD_DIR)/common/%.o) # regex treatment to switch .cpp for .o
 MPI_SOURCES = $(shell find $(SRC_DIR)/mpi -name '*.cpp') # cpp files that are used only in mpi executions
 MPI_OBJECTS = $(MPI_SOURCES:$(SRC_DIR)/mpi/%.cpp=$(BUILD_DIR)/mpi/%.o)
+LIB_FILES = $(shell find $(LIB_DIR) -name '*.*') 
+
+# Compiler settings
+
+CXX := g++ 
+MPI_CXX := mpic++
+CXX_FLAGS := -std=c++11 -I $(HEADER_DIR)
+MPI_CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -lboost_serialization -lboost_mpi # later switch for static lib?
+
+
 
 # Recipes
 
