@@ -25,7 +25,8 @@ LIB_FILES = $(shell find $(LIB_DIR) -name '*.*')
 
 CXX := g++ 
 MPI_CXX := mpic++
-CXX_FLAGS := -std=c++11 -I $(HEADER_DIR)
+CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) 
+SAVE_FLAGS := -save-temps=build/common/ioutil.o # flags for compilation optimization
 MPI_CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -lboost_serialization -lboost_mpi # later switch for static lib?
 
 
@@ -51,6 +52,7 @@ $(BUILD_DIR)/common/%.o: $(SRC_DIR)/common/%.cpp # common source files
 $(BUILD_DIR)/mpi/%.o: $(SRC_DIR)/mpi/%.cpp # mpi source files
 	$(MPI_CXX) $(MPI_CXX_FLAGS) -c $^ -o $@
 
+.PRECIOUS: $(BUILD_DIR)/common/%.o $(BUILD_DIR)/mpi/%.o # dont delete intermediary object files
 
 clean:
 	@$(RM) -r $(BUILD_DIR)
