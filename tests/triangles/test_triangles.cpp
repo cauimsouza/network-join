@@ -16,10 +16,6 @@ int main(int argc, char** argv)
 	std::string input = test_path+std::string("in")+test_name+".txt",
 				output = test_path+std::string("out")+test_name+".txt";
 
-	auto sz= read_arity(input);
-	Relation<int> graph(sz); 
-	read_relation(input, graph); 
-
 
 	// setting list of variables
 	std::vector<std::vector<int> > list_vars;
@@ -32,8 +28,8 @@ int main(int argc, char** argv)
 
 
 	// setting list of relations (they're  all the same and equal to graph)
-	std::vector<Relation<int> > list_relations;
-	for(int i=0; i<list_vars.size(); list_relations.push_back(graph), i++);
+	std::vector<std::string> list_relations;
+	for(int i=0; i<list_vars.size(); list_relations.push_back(input), i++);
 
 
 	//vector of resulting variables
