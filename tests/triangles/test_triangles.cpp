@@ -1,50 +1,104 @@
 /*
-* this file tests triangle detection for sequential algorithm
+*
+* this file tests triangle detection
 */
-
-#include <iostream>
-#include <algorithm>
-#include "relation.h"
+#include <fstream>
+#include <vector>
+#include <boost/mpi.hpp>
+#include <boost/mpi/collectives.hpp>
 #include "ioutil.h"
+#include "mpiutil.h"
 #include "util.h"
-#include <string>
+#include "debug.h"
 
-int main(int argc, char** argv)
-{
-	std::string test_path="tests/triangles/test_cases/";
-	std::string test_name="1";
-	std::string input = test_path+std::string("in")+test_name+".txt",
-				output = test_path+std::string("out")+test_name+".txt";
+using namespace std;
+
+const string RELATIONS_PATH("tests/triangles/relations/");
 
 
-	// setting list of variables
-	std::vector<std::vector<int> > list_vars;
-	list_vars.push_back(std::vector<int>{1, 2});
-	list_vars.push_back(std::vector<int>{2, 1});
-	list_vars.push_back(std::vector<int>{2, 3});
-	list_vars.push_back(std::vector<int>{3, 2});
-	list_vars.push_back(std::vector<int>{1, 3});
-	list_vars.push_back(std::vector<int>{3, 1});	
+int main(int argc, char* argv[]) {
+
+	mpi::environment env(argc, argv);
+	mpi::communicator world;	
+
+	if(argc !=3)
+	{
+		if(world.rank() == constants::ROOT){
+			cout<<"###################"<<endl;
+			cout<<"Usage: mpirun <hosts info> bin/test_join <graph file> <0:sequential, 1:normal distrib, 2:optimized distrib, 3: hypercube>"<<endl;
+			cout<<"###################"<<endl;
+		}
+		return -1;
+	}
+	
+	vector<string> rel_namesv{RELATIONS_PATH+string(argv[1]),RELATIONS_PATH+string(argv[1]),RELATIONS_PATH+string(argv[1])};
+	vector< vector<int> > varsv={{0, 1}, {1, 2}, {2, 0}};
+	vector<int> result_vars;
+	int algorithm_option = atoi(argv[2]);
+	Relation<int> result;
+	switch(algorithm_option){
+		case 0:
+			result = multiway_join(rel_namesv, varsv, result_vars);
+			break;
+		case 1:
+			result = distributed_multiway_join(rel_namesv, varsv, result_vars, false);
+			break;
+		case 2:
+			result = distributed_multiway_join(rel_namesv, varsv, result_vars, true);
+			break;
+		case 3:
+			result = hypercube_distributed_multiway_join(rel_namesv, varsv, result_vars);
+			break;
+		default:
+			if(world.rank() == constants::ROOT){
+			cout<<"###################"<<endl;
+			cout<<"Wrong algorithm option. <0:sequential, 1:normal distrib, 2:optimized distrib, 3: hypercube>"<<endl;
+			cout<<"###################"<<endl;
+			}
+			return -1;
+	}
 
 
-	// setting list of relations (they're  all the same and equal to graph)
-	std::vector<std::string> list_relations;
-	for(int i=0; i<list_vars.size(); list_relations.push_back(input), i++);
+	if (world.rank() == constants::ROOT) {\
+		cout<<"We detected "<<result.size()<<" triangles"<<endl;
+		/*pv(result_vars);
+		cout << endl;
+		for (auto it = result.begin(); it != result.end(); it++)
+			pv(*it);
+
+		// verify answer
+
+		string answer_filename = ANSWERS_PATH+string(argv[1]);
+		Relation<int> right_answer(read_arity(answer_filename));
+		read_relation(answer_filename, right_answer);
+
+		map<vector<int>, int> m1, m2;
+		for(auto tuple : right_answer)
+		{
+			if(m1.count(tuple))
+				m1[tuple]++;
+			else
+				m1[tuple]=1;
+		}
+
+		for(auto tuple : result)
+		{
+			if(m2.count(tuple))
+				m2[tuple]++;
+			else
+				m2[tuple]=1;
+		}
+		cout<<"------"<<endl;
+		cout<<right_answer<<endl;
+		cout<<"------"<<endl;
+		if (m1.size() == m2.size() && std::equal(m1.begin(), m1.end(),m2.begin())){
+			cout<<"Answer is CORRECT"<<endl;
+		}
+		else
+			cout<<"Answer is WRONG"<<endl;
+		*/
+	}
 
 
-	//vector of resulting variables
-	std::vector<int> result_vars;
-
-
-	//Relation<int> triangles = join(graph, graph, list_vars[0], list_vars[1]);
-	Relation<int> triangles = multiway_join(list_relations, list_vars, result_vars);
-
-	for(auto i : result_vars)
-		std::cout<<"x"<<i<<" ";
-	std::cout<<std::endl;
-	std::cout<<triangles;
-	std::cout<<"-----------"<<std::endl;
-	system((std::string("cat ")+output).data());
-
-	return 0;	
+	return 0;
 }
