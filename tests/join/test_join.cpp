@@ -4,6 +4,7 @@
 */
 #include <fstream>
 #include <vector>
+#include <map>
 #include <boost/mpi.hpp>
 #include <boost/mpi/collectives.hpp>
 #include "ioutil.h"
@@ -46,8 +47,8 @@ void read_test(const string filename, vector<string>& rel_namesv, vector<vector<
 
 int main(int argc, char* argv[]) {
 
-	mpi::communicator world;
-	mpi::environment env;
+        mpi::environment env(argc, argv);
+        mpi::communicator world;
 
 	if(argc !=3)
 	{

@@ -20,7 +20,7 @@ LIB_FILES = $(shell find $(LIB_DIR) -name '*.*')
 # Compiler settings
 
 CXX := mpic++ 
-CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -lboost_serialization -lboost_mpi # switch to static libs for portability?
+CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -Llib -lboost_mpi -lboost_serialization # switch to static libs for portability?
 
 # Recipes
 
