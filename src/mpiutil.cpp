@@ -13,6 +13,7 @@
 #include "util.h"
 #include "hash.h"
 #include "debug.h"
+#include "MurmurHash3.h"
 
 /*
  * This function takes a relation of integer tuples and divides it
@@ -23,10 +24,11 @@
  * @param rel original relation to be divided into nproc relations
  * @param coord coordinate according to which the tuples will be
  * 	  assigned to the different processes
+ * @param hash_method hash function used by the algorithm
  * @result a vector of truple whose concatenation is equal to the
  * 	   original relation
  */
-std::vector<Relation<int>> divide_tuples(Relation<int> &rel, int coord)
+std::vector<Relation<int>> divide_tuples(Relation<int> &rel, int coord, HashMethod hash_method)
 {
 	mpi::communicator world;
 	int world_size = world.size();
@@ -37,9 +39,22 @@ std::vector<Relation<int>> divide_tuples(Relation<int> &rel, int coord)
 		division_vector[constants::ROOT] = rel;
 	else{
 		for (auto it = rel.begin(); it != rel.end(); it++) {
-			int dst_id = mod_hash((*it)[coord], world_size);
-			// int dst_id = mult_hash((*it)[coord], world_size);
-			// int dst_id = (*it)[coord] % world_size;
+			int dst_id;
+			switch(hash_method)
+			{
+				case HashMethod::ModHash:
+			 		dst_id=mod_hash((*it)[coord], world_size);
+			 		break;
+			 	case HashMethod::MultHash:
+			 		dst_id=mult_hash((*it)[coord], world_size);
+			 		break;
+			 	case HashMethod::MurmurHash:
+			 		dst_id=murmur_hash((*it)[coord], world_size);
+			 		break;
+			 	default:
+			 		throw("Invalid hash method");
+			 		break;			
+			}
 			division_vector[dst_id].push_tuple(*it);
 		}	
 	}
@@ -73,12 +88,13 @@ namespace boost { namespace mpi {
  * @param rel2 second relation
  * @param vars1 tuple of variables for first relation
  * @param vars2 tuple of variables for second relation
+ * @param hash_method hash function used by the algorithm
  * @return result of join operation
  */
 Relation<int> distributed_join(Relation<int> &rel1,
 		      Relation<int> &rel2,
 		      std::vector<int> &vars1,
-		      std::vector<int> &vars2)
+		      std::vector<int> &vars2, HashMethod hash_method)
 {
 	mpi::communicator world;
 
@@ -101,8 +117,8 @@ Relation<int> distributed_join(Relation<int> &rel1,
 			coord1=coord2=constants::NONE;
 		}
 
-		div1 = divide_tuples(rel1, coord1);
-		div2 = divide_tuples(rel2, coord2);
+		div1 = divide_tuples(rel1, coord1, hash_method);
+		div2 = divide_tuples(rel2, coord2, hash_method);
 
 		rel1.clear();
 		rel2.clear();
@@ -134,11 +150,12 @@ Relation<int> distributed_join(Relation<int> &rel1,
  * @param rel_namesv vector containing relations' filenames
  * @param varsv vector of corresponding variables
  * @param result_vars vector to identify variables in the resulting relation
+ * @param hash_method hash function used by the algorithm
  * @return result of join operation as a new relation
  */
 Relation<int> distributed_multiway_join_simple(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
-		   std::vector<int>& result_vars)
+		   std::vector<int>& result_vars, HashMethod hash_method)
 {
 	mpi::communicator world;
 	auto rel_it = rel_namesv.begin();
@@ -176,11 +193,12 @@ Relation<int> distributed_multiway_join_simple(std::vector<std::string>& rel_nam
  * @param rel_namesv vector containing relations' filenames
  * @param varsv vector of corresponding variables
  * @param result_vars vector to identify variables in the resulting relation
+ * @param hash_method hash function used by the algorithm
  * @return result of join operation as a new relation
  */
 Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
-		   std::vector<int>& result_vars)
+		   std::vector<int>& result_vars, HashMethod hash_method)
 {
 	mpi::communicator world;
 	auto rel_it = rel_namesv.begin();
@@ -215,7 +233,7 @@ Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel
 			}
 			int division_index = (curr_division_var==constants::NONE)? 
 				constants::NONE : std::find(right_vars.begin(),right_vars.end(),curr_division_var)-right_vars.begin();
-			divided_buff_rel = divide_tuples(buff_rel, division_index);
+			divided_buff_rel = divide_tuples(buff_rel, division_index, hash_method);
 		}		
 		mpi::broadcast(world, curr_division_var, constants::ROOT);
 		Relation<int> right_subrel;
@@ -228,7 +246,7 @@ Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel
 			std::vector<Relation<int>> divided_prev_left_rel;
 			int division_index = (curr_division_var==constants::NONE)?
 				constants::NONE : std::find(left_vars.begin(),left_vars.end(),curr_division_var)-left_vars.begin();
-			divided_prev_left_rel=divide_tuples(prev_left_subrel, division_index);			
+			divided_prev_left_rel=divide_tuples(prev_left_subrel, division_index,  hash_method);			
 			for(int i=0; i<world.size(); i++){
 				mpi::reduce(world, divided_prev_left_rel[i], left_subrel, concatenate_functor<int>(), i);
 			}			
@@ -261,15 +279,16 @@ Relation<int> distributed_multiway_join_forwarding(std::vector<std::string>& rel
  * @param varsv vector of corresponding variables
  * @param result_vars vector to identify variables in the resulting relation
  * @param forward flag to enable auto-forward optimization
+ * @param hash_method hash function used by the algorithm
  * @return result of join operation as a new relation
  */
 Relation<int> distributed_multiway_join(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
-		   std::vector<int>& result_vars, bool forward)
+		   std::vector<int>& result_vars, bool forward, HashMethod hash_method)
 {
 	if(forward)
-		return  distributed_multiway_join_forwarding(rel_namesv, varsv, result_vars);
-	return distributed_multiway_join_simple(rel_namesv, varsv, result_vars);
+		return  distributed_multiway_join_forwarding(rel_namesv, varsv, result_vars, hash_method);
+	return distributed_multiway_join_simple(rel_namesv, varsv, result_vars, hash_method);
 }
 
 /*
@@ -324,20 +343,36 @@ std::vector<int> equally_factorize(int num_procs, int num_vars){
  * @param vars vector indicating the corresponding vars of the tuple
  * @param address_limits vector with the limits of each coordinate in the vector form of a process' address
  * @param destinations reference to vector where we will store the result
+ * @param hash_method hash function used by the algorithm
  */
 void calculate_destinations(Relation<int>::tuple_t& tuple, std::vector<int>& vars, std::vector<int>& address_limits, 
-	 std::vector<int>& destinations){	
+	 std::vector<int>& destinations, HashMethod hash_method){	
 	// given a vector (x1, ..., xk) where 0<=xi<mi, we can map it uniquely to  {0, ... , m1*...*mk-1}
 	// by doing h(x1, ... , xk) = x1+m1*x2+m1*m2*x3+..., which can be calculated recursively
 	// through s_k = s_(k-1)*m_k+x_k
 
 	std::function<void(int, int)> recursive_calc = 
-	[&tuple,&vars,&address_limits,&destinations, &recursive_calc](int var_index, int curr_sum){
+	[&tuple,&vars,&address_limits,&destinations, &recursive_calc, hash_method](int var_index, int curr_sum){
 		if(var_index==-1) // if I've already chosen every entry in the address, curr_sum stores the process rank
 			destinations.push_back(curr_sum);
 		else if(find(vars.begin(), vars.end(), var_index)!=vars.end()){ // if this is one the variables, use hash to decide x_k
 			int coord = find(vars.begin(), vars.end(), var_index)-vars.begin();
-			int r = mod_hash(tuple[coord], address_limits[var_index]);
+			int r;
+			switch(hash_method)
+			{
+				case HashMethod::ModHash:
+			 		r=mod_hash(tuple[coord], address_limits[var_index]);
+			 		break;
+			 	case HashMethod::MultHash:
+			 		r=mult_hash(tuple[coord], address_limits[var_index]);
+			 		break;
+			 	case HashMethod::MurmurHash:
+			 		r=murmur_hash(tuple[coord], address_limits[var_index]);
+			 		break;
+			 	default:
+			 		throw("Invalid hash method");
+			 		break;
+			}
 			recursive_calc(var_index-1, r+address_limits[var_index]*curr_sum);
 		}
 		else
@@ -357,15 +392,16 @@ void calculate_destinations(Relation<int>::tuple_t& tuple, std::vector<int>& var
  * @param divided_rel reference to vector of relations where we will store the result,i.e., the splitted relations
  * @param vars vector indicating the corresponding vars of the tuple
  * @param address_limits vector with the limits of each coordinate in the vector form of a process' address
+ * @param hash_method hash function used by the algorithm
  */
 void hypercube_divide_tuples(Relation<int>& rel, std::vector<Relation<int>>& divided_rel,
-	std::vector<int>& vars, std::vector<int>& address_limits)
+	std::vector<int>& vars, std::vector<int>& address_limits, HashMethod hash_method)
 		
 {	
 		for(auto tuple : rel)
 		{
 			std::vector<int> destinations;
-			calculate_destinations(tuple,vars,address_limits,destinations);
+			calculate_destinations(tuple,vars,address_limits,destinations, hash_method);
 			for(int dest:destinations){
 				divided_rel[dest].push_tuple(tuple);
 			}
@@ -381,11 +417,12 @@ void hypercube_divide_tuples(Relation<int>& rel, std::vector<Relation<int>>& div
  * @param varsv vector of corresponding variables
  * @param result_vars vector to identify variables in the resulting relation
  * @param forward flag to enable auto-forward optimization
+ * @param hash_method hash function used by the algorithm
  * @return result of join operation as a new relation
  */
 Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_namesv,
 		   std::vector<std::vector<int>>& varsv,
-		   std::vector<int>& result_vars)
+		   std::vector<int>& result_vars, HashMethod hash_method)
 {
 	mpi::communicator world;
 	int num_procs = world.size();
@@ -405,7 +442,7 @@ Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_
 			buff_rel.set_arity(read_arity(rel_namesv.front()));
 			read_relation(rel_namesv.front(), buff_rel); 
 			divided_buff_rel.assign(num_procs, Relation<int>(buff_rel.get_arity()));
-			hypercube_divide_tuples(buff_rel, divided_buff_rel, varsv.front(), address_limits);
+			hypercube_divide_tuples(buff_rel, divided_buff_rel, varsv.front(), address_limits, hash_method);
 	}
 	// scatter from divided_buff_rel to local_result_rel
 	mpi::scatter(world, divided_buff_rel, local_result_rel, constants::ROOT);
@@ -418,7 +455,7 @@ Relation<int> hypercube_distributed_multiway_join(std::vector<std::string>& rel_
 			buff_rel.set_arity(read_arity(*rel_it));
 			read_relation(*rel_it, buff_rel);
 			divided_buff_rel.assign(num_procs, Relation<int>(buff_rel.get_arity()));
-			hypercube_divide_tuples(buff_rel, divided_buff_rel, *vars_it, address_limits);
+			hypercube_divide_tuples(buff_rel, divided_buff_rel, *vars_it, address_limits, hash_method);
 		}	
 		//scatter from divided_buff_rel to local_buff_rel
 		mpi::scatter(world, divided_buff_rel, local_buff_rel, constants::ROOT);

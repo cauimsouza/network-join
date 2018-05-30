@@ -1,11 +1,12 @@
+# Where are you running the code?
+SALLES_DINFO=true
+
 # Project settings
 
 HEADER_DIR = include
 SRC_DIR = src
 BUILD_DIR = build
-LIB_DIR = lib
 BIN_DIR = bin
-BIN_NAME = decide_later # name of the final file
 
 # Create build directories
 $(shell mkdir -p $(BUILD_DIR)) #create directories for building
@@ -15,21 +16,18 @@ $(shell mkdir -p $(BIN_DIR))
 
 SOURCES = $(shell find $(SRC_DIR) -name '*.cpp') # cpp files 
 OBJECTS = $(SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o) # regex treatment to switch .cpp for .o
-LIB_FILES = $(shell find $(LIB_DIR) -name '*.*') 
 
 # Compiler settings
 
 CXX := mpic++ 
-CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -Llib -lboost_mpi -lboost_serialization # switch to static libs for portability?
+CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -lboost_mpi -lboost_serialization 
+ifeq ($(SALLES_DINFO),true)
+	CXX_FLAGS := -std=c++11 -I $(HEADER_DIR) -Llib -lboost_mpi -lboost_serialization # use provided lib files
+endif
 
 # Recipes
 
-#all: $(BIN_DIR)/$(BIN_NAME) #compile main executable and create a shortcut in root directory
-#	@$(RM) $(BIN_NAME)
-#	@ln -s $(BIN_DIR)/$(BIN_NAME) $(BIN_NAME) 
-
-#$(BIN_DIR)/$(BIN_NAME): $(OBJECTS) # main executable
-#	$(CXX) $(CXX_FLAGS) $^ -o $@
+all: test_join test_triangles	
 
 test_%: $(OBJECTS) tests/**/test_%.cpp 
 	$(CXX) $(CXX_FLAGS) $^ -o $(BIN_DIR)/$@	

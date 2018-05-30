@@ -45,53 +45,65 @@ void read_test(const string filename, vector<string>& rel_namesv, vector<vector<
 	f.close();
 }
 
+void throw_error(string s =
+	"Usage: mpirun -np <number of processes> bin/test_join <name of input> <sequential, normal_distrib, optimized_distrib, hypercube> [<mod_hash, mult_hash, murmur_hash>]"){
+	mpi::communicator world;
+	if(world.rank() == constants::ROOT){
+			cout<<"###################"<<endl;
+			cout<<s<<endl;
+			cout<<"###################"<<endl;
+	}
+	exit(-1);
+}
+
 int main(int argc, char* argv[]) {
 
-        mpi::environment env(argc, argv);
-        mpi::communicator world;
+    mpi::environment env(argc, argv);   
+    mpi::communicator world;
+    std::vector<string> list_names_algorithms = {"sequential", "normal_distrib", "optimized_distrib", "hypercube"};
+    std::map<string, HashMethod> list_names_hash;
+    list_names_hash[string("mod_hash")]= HashMethod::ModHash; 
+    list_names_hash[string("mult_hash")]= HashMethod::MultHash; 
+    list_names_hash[string("murmur_hash")]= HashMethod::MurmurHash;     
 
-	if(argc !=3)
-	{
-		if(world.rank() == constants::ROOT){
-			cout<<"###################"<<endl;
-			cout<<"Usage: mpirun -np <number of processes> bin/test_join <name of input> <0:sequential, 1:normal distrib, 2:optimized distrib, 3: hypercube>"<<endl;
-			cout<<"###################"<<endl;
+	if(argc <3)
+		throw_error();
+		
+	string name_algorithm = string(argv[2]);
+	if(find(list_names_algorithms.begin(), list_names_algorithms.end(), name_algorithm)==list_names_algorithms.end())
+		throw_error("Invalid algorithm option");
+
+	HashMethod hash_method;
+	if(name_algorithm!="sequential"){
+		if(argc<4)
+			hash_method =  HashMethod::ModHash; // by default
+		else
+		{
+			string name_hash = string(argv[3]);
+			if(!list_names_hash.count(name_hash))
+				throw_error("Invalid hash method");		
 		}
-		return -1;
-	}
+	}	
 	
+	string filename = INPUTS_PATH+string(argv[1]);
+	ifstream input_file(filename);
+	if(!input_file)
+		throw_error("File not found");
+
 	vector<string> rel_namesv;
-	vector< vector<int> > varsv;
-
+	vector< vector<int> > varsv;	
+	read_test(filename, rel_namesv, varsv);
+	Relation<int> result;	
+	vector<int> result_vars;	
+	if(name_algorithm == "sequential")
+		result = multiway_join(rel_namesv, varsv, result_vars);
+	else if(name_algorithm == "normal_distrib")
+		result = distributed_multiway_join(rel_namesv, varsv, result_vars, false, hash_method);
+	else if(name_algorithm =="optimized_distrib")
+		result = distributed_multiway_join(rel_namesv, varsv, result_vars, true, hash_method);
+	else if(name_algorithm == "hypercube")
+		result = hypercube_distributed_multiway_join(rel_namesv, varsv, result_vars, hash_method);			
 	
-	read_test(INPUTS_PATH+string(argv[1]), rel_namesv, varsv);
-
-
-	vector<int> result_vars;
-	int algorithm_option = atoi(argv[2]);
-	Relation<int> result;
-	switch(algorithm_option){
-		case 0:
-			result = multiway_join(rel_namesv, varsv, result_vars);
-			break;
-		case 1:
-			result = distributed_multiway_join(rel_namesv, varsv, result_vars, false);
-			break;
-		case 2:
-			result = distributed_multiway_join(rel_namesv, varsv, result_vars, true);
-			break;
-		case 3:
-			result = hypercube_distributed_multiway_join(rel_namesv, varsv, result_vars);
-			break;
-		default:
-			if(world.rank() == constants::ROOT){
-			cout<<"###################"<<endl;
-			cout<<"Wrong algorithm option. <0:sequential, 1:normal distrib, 2:optimized distrib, 3: hypercube>"<<endl;
-			cout<<"###################"<<endl;
-			}
-			return -1;
-	}
-
 
 	if (world.rank() == constants::ROOT) {
 		pv(result_vars);
@@ -99,9 +111,14 @@ int main(int argc, char* argv[]) {
 		for (auto it = result.begin(); it != result.end(); it++)
 			pv(*it);
 
-		// verify answer
-
+		
 		string answer_filename = ANSWERS_PATH+string(argv[1]);
+		ifstream answer_file(answer_filename);
+		if(!answer_file) // end program if there is no verification file
+			return 0;
+
+		// if there is exists a verification file, check if the answer is right by counting tuples
+		answer_file.close();
 		Relation<int> right_answer(read_arity(answer_filename));
 		read_relation(answer_filename, right_answer);
 
