@@ -1,3 +1,9 @@
+/*
+ * Created in Palaiseau (France) in 30/05/2018 by:
+ * Cauim de S. Lima (cauimsouza@gmail.com)
+ * Victor Hugo V. Silva (vitorvianna10@gmail.com)
+ */
+
 //-----------------------------------------------------------------------------
 // MurmurHash3 was written by Austin Appleby, and is placed in the public
 // domain. The author hereby disclaims copyright to this source code.

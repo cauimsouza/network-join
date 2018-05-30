@@ -1,3 +1,9 @@
+/*
+ * Created in Palaiseau (France) in 30/05/2018 by:
+ * Cauim de S. Lima (cauimsouza@gmail.com)
+ * Victor Hugo V. Silva (vitorvianna10@gmail.com)
+ */
+
 #ifndef UTIL_H
 #define UTIL_H
 
